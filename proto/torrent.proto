@@ -1,0 +1,22 @@
+syntax = "proto3";
+package torrent.v1;
+option go_package = "github.com/monstrong/gracker/proto/gen/go/torrent/v1";
+
+import "google/protobuf/timestamp.proto";
+service TorrentService {
+  rpc GetTorrent(GetTorrentRequest) returns (GetTorrentResponse);
+  rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
+  rpc CreateTorrent(CreateTorrentRequest) returns (CreateTorrentResponse);
+  rpc DeleteTorrent(DeleteTorrentRequest) returns (DeleteTorrentResponse);
+}
+
+message Torrent {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string info_hash = 4;
+  string status = 5;
+  string author = 6;
+
+  google.protobuf.Timestamp created_at = 7;
+}
