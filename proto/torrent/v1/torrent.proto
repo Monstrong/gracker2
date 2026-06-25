@@ -1,0 +1,58 @@
+syntax = "proto3";
+package torrent.v1;
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/torrent/v1";
+
+// из корня:
+// protoc   -I/usr/local/include   -I.   --go_out=.   --go_opt=module=github.com/monstrong/gracker2   --go-grpc_out=.   --go-grpc_opt=module=github.com/monstrong/gracker2   proto/torrent/v1/torrent.proto
+
+import "google/protobuf/timestamp.proto";
+service TorrentService {
+  rpc GetTorrent(GetTorrentRequest) returns (GetTorrentResponse);
+  rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
+  rpc CreateTorrent(CreateTorrentRequest) returns (CreateTorrentResponse);
+  rpc DeleteTorrent(DeleteTorrentRequest) returns (DeleteTorrentResponse);
+}
+
+message GetTorrentRequest {
+  string id = 1;
+}
+
+message GetTorrentResponse {
+  Torrent torrent = 1;
+}
+
+message ListTorrentsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListTorrentsResponse {
+  repeated Torrent torrents = 1;
+}
+
+message CreateTorrentRequest {
+  Torrent torrent = 1;
+}
+
+message CreateTorrentResponse {
+  Torrent torrent = 1;
+}
+
+message DeleteTorrentRequest {
+  int64 id = 1;
+}
+message DeleteTorrentResponse {
+  bool deleted = 1;
+}
+message Torrent {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  string info_hash = 4;
+  int64 author_id = 5;
+  int64 category_id = 6;
+  int64 downloads = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+

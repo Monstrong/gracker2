@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS torrents (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    info_hash VARCHAR(64) NOT NULL UNIQUE,
+    status SMALLINT NOT NULL DEFAULT 0,
+    author_id INT NOT NULL,
+    category_id INT NOT NULL,
+    downloads INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
