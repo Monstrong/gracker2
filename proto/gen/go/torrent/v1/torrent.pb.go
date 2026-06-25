@@ -208,7 +208,11 @@ func (x *ListTorrentsResponse) GetTorrents() []*Torrent {
 
 type CreateTorrentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Torrent       *Torrent               `protobuf:"bytes,1,opt,name=torrent,proto3" json:"torrent,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	InfoHash      string                 `protobuf:"bytes,3,opt,name=info_hash,json=infoHash,proto3" json:"info_hash,omitempty"`
+	AuthorId      int64                  `protobuf:"varint,4,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	CategoryId    int64                  `protobuf:"varint,5,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -243,11 +247,39 @@ func (*CreateTorrentRequest) Descriptor() ([]byte, []int) {
 	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CreateTorrentRequest) GetTorrent() *Torrent {
+func (x *CreateTorrentRequest) GetName() string {
 	if x != nil {
-		return x.Torrent
+		return x.Name
 	}
-	return nil
+	return ""
+}
+
+func (x *CreateTorrentRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateTorrentRequest) GetInfoHash() string {
+	if x != nil {
+		return x.InfoHash
+	}
+	return ""
+}
+
+func (x *CreateTorrentRequest) GetAuthorId() int64 {
+	if x != nil {
+		return x.AuthorId
+	}
+	return 0
+}
+
+func (x *CreateTorrentRequest) GetCategoryId() int64 {
+	if x != nil {
+		return x.CategoryId
+	}
+	return 0
 }
 
 type CreateTorrentResponse struct {
@@ -390,9 +422,10 @@ type Torrent struct {
 	InfoHash      string                 `protobuf:"bytes,4,opt,name=info_hash,json=infoHash,proto3" json:"info_hash,omitempty"`
 	AuthorId      int64                  `protobuf:"varint,5,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
 	CategoryId    int64                  `protobuf:"varint,6,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Downloads     int64                  `protobuf:"varint,7,opt,name=downloads,proto3" json:"downloads,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Status        int32                  `protobuf:"varint,7,opt,name=status,proto3" json:"status,omitempty"`
+	Downloads     int64                  `protobuf:"varint,8,opt,name=downloads,proto3" json:"downloads,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -469,6 +502,13 @@ func (x *Torrent) GetCategoryId() int64 {
 	return 0
 }
 
+func (x *Torrent) GetStatus() int32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
 func (x *Torrent) GetDownloads() int64 {
 	if x != nil {
 		return x.Downloads
@@ -504,15 +544,20 @@ const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offset\"G\n" +
 	"\x14ListTorrentsResponse\x12/\n" +
-	"\btorrents\x18\x01 \x03(\v2\x13.torrent.v1.TorrentR\btorrents\"E\n" +
-	"\x14CreateTorrentRequest\x12-\n" +
-	"\atorrent\x18\x01 \x01(\v2\x13.torrent.v1.TorrentR\atorrent\"F\n" +
+	"\btorrents\x18\x01 \x03(\v2\x13.torrent.v1.TorrentR\btorrents\"\xa7\x01\n" +
+	"\x14CreateTorrentRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1b\n" +
+	"\tinfo_hash\x18\x03 \x01(\tR\binfoHash\x12\x1b\n" +
+	"\tauthor_id\x18\x04 \x01(\x03R\bauthorId\x12\x1f\n" +
+	"\vcategory_id\x18\x05 \x01(\x03R\n" +
+	"categoryId\"F\n" +
 	"\x15CreateTorrentResponse\x12-\n" +
 	"\atorrent\x18\x01 \x01(\v2\x13.torrent.v1.TorrentR\atorrent\"&\n" +
 	"\x14DeleteTorrentRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\"1\n" +
 	"\x15DeleteTorrentResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xbe\x02\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xd6\x02\n" +
 	"\aTorrent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -520,12 +565,14 @@ const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	"\tinfo_hash\x18\x04 \x01(\tR\binfoHash\x12\x1b\n" +
 	"\tauthor_id\x18\x05 \x01(\x03R\bauthorId\x12\x1f\n" +
 	"\vcategory_id\x18\x06 \x01(\x03R\n" +
-	"categoryId\x12\x1c\n" +
-	"\tdownloads\x18\a \x01(\x03R\tdownloads\x129\n" +
+	"categoryId\x12\x16\n" +
+	"\x06status\x18\a \x01(\x05R\x06status\x12\x1c\n" +
+	"\tdownloads\x18\b \x01(\x03R\tdownloads\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xdc\x02\n" +
+	"updated_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xdc\x02\n" +
 	"\x0eTorrentService\x12K\n" +
 	"\n" +
 	"GetTorrent\x12\x1d.torrent.v1.GetTorrentRequest\x1a\x1e.torrent.v1.GetTorrentResponse\x12Q\n" +
@@ -559,25 +606,24 @@ var file_proto_torrent_v1_torrent_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
 }
 var file_proto_torrent_v1_torrent_proto_depIdxs = []int32{
-	8,  // 0: torrent.v1.GetTorrentResponse.torrent:type_name -> torrent.v1.Torrent
-	8,  // 1: torrent.v1.ListTorrentsResponse.torrents:type_name -> torrent.v1.Torrent
-	8,  // 2: torrent.v1.CreateTorrentRequest.torrent:type_name -> torrent.v1.Torrent
-	8,  // 3: torrent.v1.CreateTorrentResponse.torrent:type_name -> torrent.v1.Torrent
-	9,  // 4: torrent.v1.Torrent.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: torrent.v1.Torrent.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 6: torrent.v1.TorrentService.GetTorrent:input_type -> torrent.v1.GetTorrentRequest
-	2,  // 7: torrent.v1.TorrentService.ListTorrents:input_type -> torrent.v1.ListTorrentsRequest
-	4,  // 8: torrent.v1.TorrentService.CreateTorrent:input_type -> torrent.v1.CreateTorrentRequest
-	6,  // 9: torrent.v1.TorrentService.DeleteTorrent:input_type -> torrent.v1.DeleteTorrentRequest
-	1,  // 10: torrent.v1.TorrentService.GetTorrent:output_type -> torrent.v1.GetTorrentResponse
-	3,  // 11: torrent.v1.TorrentService.ListTorrents:output_type -> torrent.v1.ListTorrentsResponse
-	5,  // 12: torrent.v1.TorrentService.CreateTorrent:output_type -> torrent.v1.CreateTorrentResponse
-	7,  // 13: torrent.v1.TorrentService.DeleteTorrent:output_type -> torrent.v1.DeleteTorrentResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	8, // 0: torrent.v1.GetTorrentResponse.torrent:type_name -> torrent.v1.Torrent
+	8, // 1: torrent.v1.ListTorrentsResponse.torrents:type_name -> torrent.v1.Torrent
+	8, // 2: torrent.v1.CreateTorrentResponse.torrent:type_name -> torrent.v1.Torrent
+	9, // 3: torrent.v1.Torrent.created_at:type_name -> google.protobuf.Timestamp
+	9, // 4: torrent.v1.Torrent.updated_at:type_name -> google.protobuf.Timestamp
+	0, // 5: torrent.v1.TorrentService.GetTorrent:input_type -> torrent.v1.GetTorrentRequest
+	2, // 6: torrent.v1.TorrentService.ListTorrents:input_type -> torrent.v1.ListTorrentsRequest
+	4, // 7: torrent.v1.TorrentService.CreateTorrent:input_type -> torrent.v1.CreateTorrentRequest
+	6, // 8: torrent.v1.TorrentService.DeleteTorrent:input_type -> torrent.v1.DeleteTorrentRequest
+	1, // 9: torrent.v1.TorrentService.GetTorrent:output_type -> torrent.v1.GetTorrentResponse
+	3, // 10: torrent.v1.TorrentService.ListTorrents:output_type -> torrent.v1.ListTorrentsResponse
+	5, // 11: torrent.v1.TorrentService.CreateTorrent:output_type -> torrent.v1.CreateTorrentResponse
+	7, // 12: torrent.v1.TorrentService.DeleteTorrent:output_type -> torrent.v1.DeleteTorrentResponse
+	9, // [9:13] is the sub-list for method output_type
+	5, // [5:9] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_proto_torrent_v1_torrent_proto_init() }
