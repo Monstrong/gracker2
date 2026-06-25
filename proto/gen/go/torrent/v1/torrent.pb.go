@@ -211,8 +211,8 @@ type CreateTorrentRequest struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	InfoHash      string                 `protobuf:"bytes,3,opt,name=info_hash,json=infoHash,proto3" json:"info_hash,omitempty"`
-	AuthorId      int64                  `protobuf:"varint,4,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
-	CategoryId    int64                  `protobuf:"varint,5,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	AuthorId      string                 `protobuf:"bytes,4,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	CategoryId    string                 `protobuf:"bytes,5,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -268,18 +268,18 @@ func (x *CreateTorrentRequest) GetInfoHash() string {
 	return ""
 }
 
-func (x *CreateTorrentRequest) GetAuthorId() int64 {
+func (x *CreateTorrentRequest) GetAuthorId() string {
 	if x != nil {
 		return x.AuthorId
 	}
-	return 0
+	return ""
 }
 
-func (x *CreateTorrentRequest) GetCategoryId() int64 {
+func (x *CreateTorrentRequest) GetCategoryId() string {
 	if x != nil {
 		return x.CategoryId
 	}
-	return 0
+	return ""
 }
 
 type CreateTorrentResponse struct {
@@ -328,7 +328,7 @@ func (x *CreateTorrentResponse) GetTorrent() *Torrent {
 
 type DeleteTorrentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -363,11 +363,11 @@ func (*DeleteTorrentRequest) Descriptor() ([]byte, []int) {
 	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *DeleteTorrentRequest) GetId() int64 {
+func (x *DeleteTorrentRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
-	return 0
+	return ""
 }
 
 type DeleteTorrentResponse struct {
@@ -416,12 +416,12 @@ func (x *DeleteTorrentResponse) GetDeleted() bool {
 
 type Torrent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	InfoHash      string                 `protobuf:"bytes,4,opt,name=info_hash,json=infoHash,proto3" json:"info_hash,omitempty"`
-	AuthorId      int64                  `protobuf:"varint,5,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
-	CategoryId    int64                  `protobuf:"varint,6,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	AuthorId      string                 `protobuf:"bytes,5,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
+	CategoryId    string                 `protobuf:"bytes,6,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
 	Status        int32                  `protobuf:"varint,7,opt,name=status,proto3" json:"status,omitempty"`
 	Downloads     int64                  `protobuf:"varint,8,opt,name=downloads,proto3" json:"downloads,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -460,11 +460,11 @@ func (*Torrent) Descriptor() ([]byte, []int) {
 	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *Torrent) GetId() int64 {
+func (x *Torrent) GetId() string {
 	if x != nil {
 		return x.Id
 	}
-	return 0
+	return ""
 }
 
 func (x *Torrent) GetName() string {
@@ -488,18 +488,18 @@ func (x *Torrent) GetInfoHash() string {
 	return ""
 }
 
-func (x *Torrent) GetAuthorId() int64 {
+func (x *Torrent) GetAuthorId() string {
 	if x != nil {
 		return x.AuthorId
 	}
-	return 0
+	return ""
 }
 
-func (x *Torrent) GetCategoryId() int64 {
+func (x *Torrent) GetCategoryId() string {
 	if x != nil {
 		return x.CategoryId
 	}
-	return 0
+	return ""
 }
 
 func (x *Torrent) GetStatus() int32 {
@@ -549,22 +549,22 @@ const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1b\n" +
 	"\tinfo_hash\x18\x03 \x01(\tR\binfoHash\x12\x1b\n" +
-	"\tauthor_id\x18\x04 \x01(\x03R\bauthorId\x12\x1f\n" +
-	"\vcategory_id\x18\x05 \x01(\x03R\n" +
+	"\tauthor_id\x18\x04 \x01(\tR\bauthorId\x12\x1f\n" +
+	"\vcategory_id\x18\x05 \x01(\tR\n" +
 	"categoryId\"F\n" +
 	"\x15CreateTorrentResponse\x12-\n" +
 	"\atorrent\x18\x01 \x01(\v2\x13.torrent.v1.TorrentR\atorrent\"&\n" +
 	"\x14DeleteTorrentRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x03R\x02id\"1\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"1\n" +
 	"\x15DeleteTorrentResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xd6\x02\n" +
 	"\aTorrent\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
 	"\tinfo_hash\x18\x04 \x01(\tR\binfoHash\x12\x1b\n" +
-	"\tauthor_id\x18\x05 \x01(\x03R\bauthorId\x12\x1f\n" +
-	"\vcategory_id\x18\x06 \x01(\x03R\n" +
+	"\tauthor_id\x18\x05 \x01(\tR\bauthorId\x12\x1f\n" +
+	"\vcategory_id\x18\x06 \x01(\tR\n" +
 	"categoryId\x12\x16\n" +
 	"\x06status\x18\a \x01(\x05R\x06status\x12\x1c\n" +
 	"\tdownloads\x18\b \x01(\x03R\tdownloads\x129\n" +
