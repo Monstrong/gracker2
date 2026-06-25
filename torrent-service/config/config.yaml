@@ -1,0 +1,11 @@
+app:
+  name: torrent-service
+  port: 50051
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_torrents
+  max_conns: 10
+logger:
+  level: debug
