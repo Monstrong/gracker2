@@ -1,15 +1,1 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-CREATE TABLE IF NOT EXISTS torrents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    info_hash VARCHAR(64) NOT NULL UNIQUE,
-    status SMALLINT NOT NULL DEFAULT 0,
-    author_id UUID NOT NULL,
-    category_id UUID NOT NULL,
-    downloads INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
+DROP TABLE IF EXISTS torrents;
