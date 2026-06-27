@@ -9,26 +9,26 @@ import (
 )
 
 type Config struct {
-	App `mapstructure:"app" yaml:"app"`
+	App      `mapstructure:"app" yaml:"app"`
 	Postgres `mapstructure:"postgres" yaml:"postgres"`
-	Logger `mapstructure:"logger" yaml:"logger"`
+	Logger   `mapstructure:"logger" yaml:"logger"`
 }
 
 type App struct {
 	Name string `mapstructure:"name" yaml:"name"`
-	Port int `mapstructure:"port" yaml:"port"`
-} 
+	Port int    `mapstructure:"port" yaml:"port"`
+}
 type Postgres struct {
-	Host string `mapstructure:"host" yaml:"host"`
-	Port int	`mapstructure:"port" yaml:"port"`
-	User string `mapstructure:"user" yaml:"user"`
+	Host     string `mapstructure:"host" yaml:"host"`
+	Port     int    `mapstructure:"port" yaml:"port"`
+	User     string `mapstructure:"user" yaml:"user"`
 	Password string
-	DBName string `mapstructure:"dbname" yaml:"dbname"`
-	MaxCon int `mapstructure:"max_conns" yaml:"max_conns"`
-} 
+	DBName   string `mapstructure:"dbname" yaml:"dbname"`
+	MaxCon   int    `mapstructure:"max_conns" yaml:"max_conns"`
+}
 type Logger struct {
 	Level string `mapstructure:"level" yaml:"level"`
-} 
+}
 
 const configYamlPath = "config/config.yaml"
 const configEnvPath = "config/.env"
