@@ -24,7 +24,8 @@ type Postgres struct {
 	User     string `mapstructure:"user" yaml:"user"`
 	Password string
 	DBName   string `mapstructure:"dbname" yaml:"dbname"`
-	MaxCon   int    `mapstructure:"max_conns" yaml:"max_conns"`
+	MaxConns   int    `mapstructure:"max_conns" yaml:"max_conns"`
+	SSLMode  string `mapstructure:"ssl_mode"`
 }
 type Logger struct {
 	Level string `mapstructure:"level" yaml:"level"`

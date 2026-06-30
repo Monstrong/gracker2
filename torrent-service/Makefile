@@ -10,4 +10,4 @@ migrate-down:
 	migrate -path migrations -database "$(MIGRATE_DSN)" down 1
 
 run:
-	go run ./cmd/app
+	go run ./cmd/server
