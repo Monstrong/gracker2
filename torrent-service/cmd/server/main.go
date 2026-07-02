@@ -6,6 +6,7 @@ import (
 
 	"github.com/monstrong/gracker2/torrent-service/internal/config"
 	"github.com/monstrong/gracker2/torrent-service/pkg/db"
+	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
 )
 
 func main() {
@@ -22,5 +23,9 @@ func main() {
 	defer pool.Close()
 	fmt.Println(pool)
 
+	logger, err := logger.New(&cfg.Logger)
+	if err != nil {
+		log.Fatal("some error creating logger")
+	}
 	
 }
