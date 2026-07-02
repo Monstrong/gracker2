@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -36,6 +35,6 @@ func main() {
 	defer pool.Close()
 	l.Info(ctx, "db pool init complete")
 
-
+	repo := 
 	
 }

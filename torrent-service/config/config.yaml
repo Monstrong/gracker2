@@ -9,4 +9,4 @@ postgres:
   max_conns: 10
   ssl_mode: disable
 logger:
-  level: debug
+  level: local

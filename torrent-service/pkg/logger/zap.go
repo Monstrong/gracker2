@@ -33,7 +33,7 @@ func New(cfg *config.Logger) (Logger, error) {
 	var invalidLevel bool = false
 
 	switch cfg.Level {
-	case "dev", "development":
+	case "dev", "development", "local":
 		logger, err = zap.NewDevelopment()
 	case "prod", "production":
 		logger, err = zap.NewProduction()
