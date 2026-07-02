@@ -24,7 +24,8 @@ type Postgres struct {
 	User     string `mapstructure:"user" yaml:"user"`
 	Password string
 	DBName   string `mapstructure:"dbname" yaml:"dbname"`
-	MaxCon   int    `mapstructure:"max_conns" yaml:"max_conns"`
+	MaxConns   int    `mapstructure:"max_conns" yaml:"max_conns"`
+	SSLMode  string `mapstructure:"ssl_mode"`
 }
 type Logger struct {
 	Level string `mapstructure:"level" yaml:"level"`
@@ -32,6 +33,7 @@ type Logger struct {
 
 const configYamlPath = "config/config.yaml"
 const configEnvPath = "config/.env"
+const postgresPasswordName = "POSTGRES_PASSWORD"
 
 func Load() (*Config, error) {
 	cfg := &Config{}
@@ -40,13 +42,15 @@ func Load() (*Config, error) {
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("error reading config.yaml:%w", err)
 	}
+
 	_ = godotenv.Load(configEnvPath)
 	v.AutomaticEnv()
+
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
 
-	cfg.Postgres.Password = os.Getenv("POSTGRES_PASSWORD")
+	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
 
 	return cfg, nil
 }
