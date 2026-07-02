@@ -12,9 +12,11 @@ option go_package = "github.com/monstrong/gracker2/proto/gen/go/torrent/v1";
 import "google/protobuf/timestamp.proto";
 service TorrentService {
   rpc GetTorrent(GetTorrentRequest) returns (GetTorrentResponse);
-  rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
   rpc CreateTorrent(CreateTorrentRequest) returns (CreateTorrentResponse);
   rpc DeleteTorrent(DeleteTorrentRequest) returns (DeleteTorrentResponse);
+  
+  // TODO: add filters
+  rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
 }
 
 message GetTorrentRequest {

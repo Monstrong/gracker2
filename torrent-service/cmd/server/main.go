@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/monstrong/gracker2/torrent-service/internal/config"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 	"github.com/monstrong/gracker2/torrent-service/pkg/db"
 	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
 	"go.uber.org/zap"
@@ -35,6 +38,5 @@ func main() {
 	defer pool.Close()
 	l.Info(ctx, "db pool init complete")
 
-	repo := 
-	
+	repo := repository.NewPostgresRepository(pool)
 }
