@@ -55,8 +55,6 @@ func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*mo
 
 func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
 	const op = "repo.postgres.list"
-
-	//TODO: filters
 	var ts []*models.Torrent
 	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents 
 	ORDER BY created_at DESC LIMIT $1 OFFSET $2`
