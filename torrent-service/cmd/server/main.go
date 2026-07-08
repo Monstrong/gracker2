@@ -8,6 +8,7 @@ import (
 	"github.com/monstrong/gracker2/torrent-service/internal/config"
 	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	"github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
 	"github.com/monstrong/gracker2/torrent-service/pkg/db"
 	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
 	"go.uber.org/zap"
@@ -39,5 +40,7 @@ func main() {
 
 	repo := repository.NewPostgresRepository(pool)
 	service := service.NewTorrentService(repo)
+	handler := grpc.NewServer(service)
+	
 	
 }
