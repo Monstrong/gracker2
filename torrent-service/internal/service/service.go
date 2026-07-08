@@ -30,7 +30,7 @@ func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*
 	case torrent.CategoryID == uuid.Nil:
 		return nil, fmt.Errorf("%s: %w: 'category_id' is required", op, models.ErrInvalidData)
 	}
-	
+
 	m, err := s.r.Create(ctx, torrent)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -40,7 +40,7 @@ func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*
 
 func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error) {
 	const op = "service.torrentService.delete"
-	
+
 	if id == uuid.Nil {
 		return false, fmt.Errorf("%s: %w", op, models.ErrInvalidData)
 	}
@@ -54,7 +54,7 @@ func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error)
 
 func (s *TorrentService) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
 	const op = "service.torrentService.list"
-	
+
 	ms, err := s.r.List(ctx, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -64,7 +64,7 @@ func (s *TorrentService) List(ctx context.Context, limit, offset int) ([]*models
 
 func (s *TorrentService) GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error) {
 	const op = "service.torrentService.getByID"
-	
+
 	if id == uuid.Nil {
 		return nil, fmt.Errorf("%s: %w", op, models.ErrInvalidData)
 	}

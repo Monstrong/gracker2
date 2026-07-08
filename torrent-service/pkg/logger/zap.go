@@ -12,8 +12,8 @@ import (
 type contextKey string
 
 const (
-	loggerRequestIDKey contextKey = "x-request-id"
-	loggerTraceIDKey   contextKey = "x-trace-id"
+	LoggerRequestIDKey contextKey = "x-request-id"
+	LoggerTraceIDKey   contextKey = "x-trace-id"
 )
 
 type Logger interface {
@@ -61,19 +61,19 @@ func New(cfg *config.Logger) (*L, error) {
 
 
 func WithRequestID (ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, loggerRequestIDKey, id)
+	return context.WithValue(ctx, LoggerRequestIDKey, id)
 }
 func WithTraceID (ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, loggerTraceIDKey, id)
+	return context.WithValue(ctx, LoggerTraceIDKey, id)
 }
 
 func (l *L) extractContextID (ctx context.Context) *zap.Logger{
 	logger := l.z
-	if reqID, ok := ctx.Value(loggerRequestIDKey).(string); ok {
+	if reqID, ok := ctx.Value(LoggerRequestIDKey).(string); ok {
 		logger = logger.With(zap.String("x-request-id", reqID))
 	}
 
-	if traceID, ok := ctx.Value(loggerTraceIDKey).(string); ok {
+	if traceID, ok := ctx.Value(LoggerTraceIDKey).(string); ok {
 		logger = logger.With(zap.String("x-trace-id", traceID))
 	}
 
