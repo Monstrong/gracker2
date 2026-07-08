@@ -25,6 +25,10 @@ func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*
 		return nil, fmt.Errorf("%s: %w: 'name' is required", op, models.ErrInvalidData)
 	case torrent.InfoHash == "":
 		return nil, fmt.Errorf("%s: %w: 'info_hash' is required", op, models.ErrInvalidData)
+	case torrent.AuthorID == uuid.Nil:
+		return nil, fmt.Errorf("%s: %w: 'author_id' is required", op, models.ErrInvalidData)
+	case torrent.CategoryID == uuid.Nil:
+		return nil, fmt.Errorf("%s: %w: 'category_id' is required", op, models.ErrInvalidData)
 	}
 	
 	m, err := s.r.Create(ctx, torrent)
