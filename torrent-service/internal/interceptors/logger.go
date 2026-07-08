@@ -17,7 +17,7 @@ func LoggingInterseptor(l logger.Logger) grpc.UnaryServerInterceptor {
 		req any, 
 		info *grpc.UnaryServerInfo, 
 		handler grpc.UnaryHandler,
-	) (resp any, err error) {
+	) (any, error) {
 		start := time.Now()
 		reqID := uuid.New().String()
 		ctx = logger.WithRequestID(ctx, reqID)
