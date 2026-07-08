@@ -11,7 +11,7 @@ import (
 )
 
 
-func RecoveryInterseptor(l logger.Logger) grpc.UnaryServerInterceptor {
+func RecoveryInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context, 
 		req any, 

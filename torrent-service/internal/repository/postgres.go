@@ -47,7 +47,7 @@ func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*mo
 		&t.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%s:%w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	return t, nil
 
@@ -60,7 +60,7 @@ func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]*mo
 	ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("%s:%w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	defer rows.Close()
 

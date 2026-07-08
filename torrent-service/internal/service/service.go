@@ -22,13 +22,13 @@ func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*
 
 	switch {
 	case torrent.Name == "":
-		return nil, fmt.Errorf("%s: %w: 'name' is required", op, models.ErrInvalidData)
+		return nil, fmt.Errorf("%w: 'name' is required", models.ErrInvalidData)
 	case torrent.InfoHash == "":
-		return nil, fmt.Errorf("%s: %w: 'info_hash' is required", op, models.ErrInvalidData)
+		return nil, fmt.Errorf("%w: 'info_hash' is required", models.ErrInvalidData)
 	case torrent.AuthorID == uuid.Nil:
-		return nil, fmt.Errorf("%s: %w: 'author_id' is required", op, models.ErrInvalidData)
+		return nil, fmt.Errorf("%w: 'author_id' is required", models.ErrInvalidData)
 	case torrent.CategoryID == uuid.Nil:
-		return nil, fmt.Errorf("%s: %w: 'category_id' is required", op, models.ErrInvalidData)
+		return nil, fmt.Errorf("%w: 'category_id' is required", models.ErrInvalidData)
 	}
 
 	m, err := s.r.Create(ctx, torrent)
@@ -42,7 +42,7 @@ func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error)
 	const op = "service.torrentService.delete"
 
 	if id == uuid.Nil {
-		return false, fmt.Errorf("%s: %w", op, models.ErrInvalidData)
+		return false, fmt.Errorf("%w: invalid torrent id", models.ErrInvalidData)
 	}
 
 	isDeleted, err := s.r.Delete(ctx, id)
@@ -66,7 +66,7 @@ func (s *TorrentService) GetByID(ctx context.Context, id uuid.UUID) (*models.Tor
 	const op = "service.torrentService.getByID"
 
 	if id == uuid.Nil {
-		return nil, fmt.Errorf("%s: %w", op, models.ErrInvalidData)
+		return nil, fmt.Errorf("%w: invalid torrent id", models.ErrInvalidData)
 	}
 
 	m, err := s.r.GetByID(ctx, id)

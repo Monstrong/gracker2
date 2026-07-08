@@ -2,17 +2,21 @@ package interceptors
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
 	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 const DurationKey = "request-duration"
 
-func LoggingInterseptor(l logger.Logger) grpc.UnaryServerInterceptor {
+func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context, 
 		req any, 
@@ -44,17 +48,23 @@ func LoggingInterseptor(l logger.Logger) grpc.UnaryServerInterceptor {
 		duration := time.Since(start)
 
 		
+		// ErrInvalidData отдается без "обертки"
 		if err != nil {
-			l.Error(ctx, info.FullMethod,
-				logger.Duration(DurationKey, duration),
-				logger.Error(err),
-			)
+			switch {
+			case errors.Is(err, models.ErrNotFound):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+				err = status.Error(codes.NotFound, models.ErrNotFound.Error())
+			case errors.Is(err, models.ErrInvalidData):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+				err = status.Error(codes.InvalidArgument, err.Error())
+			default:
+				l.Error(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+				err = status.Error(codes.Internal, models.ErrInternal.Error())
+			}
 		} else {
-			l.Info(ctx, info.FullMethod,
-				logger.Duration(DurationKey, duration),
+			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration),
 			)
 		}
-
 		return res, err
 	}
 }
