@@ -11,7 +11,6 @@ import (
 	"github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
 	"github.com/monstrong/gracker2/torrent-service/pkg/db"
 	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -27,12 +26,16 @@ func main() {
 	if err != nil {
 		log.Fatal("some error creating logger")
 	}
+	
 	l.Info(ctx, "config & logger init complete")
+	defer func() {
+        l.Sync()
+    }()
 
 	// makes pool and does Ping
 	pool, err := db.NewPool(&cfg.Postgres)
 	if err != nil {
-		l.Error(ctx, "creating db pool and doing Ping", zap.Error(err))
+		l.Error(ctx, "creating db pool and doing Ping", logger.Error(err))
 		os.Exit(1)
 	}
 	defer pool.Close()
@@ -41,6 +44,6 @@ func main() {
 	repo := repository.NewPostgresRepository(pool)
 	service := service.NewTorrentService(repo)
 	handler := grpc.NewServer(service)
-	
+
 	
 }
