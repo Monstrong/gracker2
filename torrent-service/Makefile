@@ -1,13 +1,19 @@
 include config/.env
 export
 
-.PHONY: migrate-up migrate-down run
+.PHONY: migrate-up migrate-down migrate-step migrate-step-down run
 
 migrate-up:
-	migrate -path migrations -database "$(MIGRATE_DSN)" up
+	go run ./cmd/migrate up
 
 migrate-down:
-	migrate -path migrations -database "$(MIGRATE_DSN)" down 1
+	go run ./cmd/migrate down
+
+migrate-step:
+	go run ./cmd/migrate step 1
+
+migrate-step-down:
+	go run ./cmd/migrate step -1
 
 run:
 	go run ./cmd/server
