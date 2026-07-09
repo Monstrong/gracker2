@@ -64,7 +64,7 @@ func main() {
 		))
 	pb.RegisterTorrentServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(ctx, pool, cfg, l)
+	httpServer := infraServerInit(pool, cfg, l)
 	g, errgr_ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -140,7 +140,7 @@ func main() {
 }
 
 
-func infraServerInit(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
+func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +149,10 @@ func infraServerInit(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config
 	})
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		if err := pool.Ping(ctx); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte("ERROR"))
