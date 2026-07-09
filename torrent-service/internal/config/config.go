@@ -17,6 +17,7 @@ type Config struct {
 type App struct {
 	Name string `mapstructure:"name" yaml:"name"`
 	Port int    `mapstructure:"port" yaml:"port"`
+	InfraPort int `mapstructure:"infra-port" yaml:"infra-port"`
 }
 type Postgres struct {
 	Host     string `mapstructure:"host" yaml:"host"`

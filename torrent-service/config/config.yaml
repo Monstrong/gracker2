@@ -1,6 +1,7 @@
 app:
   name: torrent-service
   port: 50051
+  infra-port: 8080
 postgres:
   host: localhost
   port: 5432
