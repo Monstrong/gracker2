@@ -132,7 +132,7 @@ func main() {
 		if err == http.ErrServerClosed {
 			l.Info(ctx, "torrent-service stopped gracefully")
 		} else {
-			l.Error(ctx, "server stopped with error", logger.Error(err))
+			l.Error(ctx, "torrent-service stopped with error", logger.Error(err))
 		}
 	} else {
 		l.Info(ctx, "torrent-service stopped gracefully")

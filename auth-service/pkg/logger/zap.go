@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/monstrong/auth-service/internal/config"
+	"github.com/monstrong/gracker2/auth-service/internal/config"
 	"go.uber.org/zap"
 )
 

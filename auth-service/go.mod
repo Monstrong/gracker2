@@ -1,4 +1,4 @@
-module github.com/monstrong/auth-service
+module github.com/monstrong/gracker2/auth-service
 
 go 1.26.2
 
@@ -8,11 +8,19 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.28.0
+	google.golang.org/grpc v1.74.2
+)
+
+require (
+	golang.org/x/net v0.47.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
+	google.golang.org/protobuf v1.36.7 // indirect
 )
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect

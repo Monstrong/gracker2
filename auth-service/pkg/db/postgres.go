@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/auth-service/internal/config"
+	"github.com/monstrong/gracker2/auth-service/internal/config"
 )
 
 func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
