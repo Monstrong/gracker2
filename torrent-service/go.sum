@@ -69,8 +69,8 @@ github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3N
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/moby/term v0.5.0 h1:xt8Q1nalod/v7BqbG21f8mQPqH+xAaC9C3N3wfWbVP0=
 github.com/moby/term v0.5.0/go.mod h1:8FzsFHVUBGZdbDsJw/ot+X+d5HLUbvklYLJ9uGfcI3Y=
-github.com/monstrong/gracker2/proto v0.0.0-20260709155347-b056aed438c7 h1:bSsfLhpn/LjdlAF5Gyr0enXhUhXL8hst6cA3gKzRJwA=
-github.com/monstrong/gracker2/proto v0.0.0-20260709155347-b056aed438c7/go.mod h1:b3doFyOIHsp7+Y7awmhd29A3k3yHpsIRBUJgNtXlY0M=
+github.com/monstrong/gracker2/proto v0.1.0 h1:OTh9nrqM0BbBcLVDmO0T/1bCja44R7/RYg8cuXpDbgQ=
+github.com/monstrong/gracker2/proto v0.1.0/go.mod h1:b3doFyOIHsp7+Y7awmhd29A3k3yHpsIRBUJgNtXlY0M=
 github.com/morikuni/aec v1.0.0 h1:nP9CBfwrvYnBRgY6qfDQkygYDmYwOilePFkwzv4dU8A=
 github.com/morikuni/aec v1.0.0/go.mod h1:BbKIizmSmc5MMPqRYbxO4ZU0S0+P200+tUnFx7PXmsc=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=

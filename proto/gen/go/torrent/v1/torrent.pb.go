@@ -575,10 +575,10 @@ const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xdc\x02\n" +
 	"\x0eTorrentService\x12K\n" +
 	"\n" +
-	"GetTorrent\x12\x1d.torrent.v1.GetTorrentRequest\x1a\x1e.torrent.v1.GetTorrentResponse\x12Q\n" +
-	"\fListTorrents\x12\x1f.torrent.v1.ListTorrentsRequest\x1a .torrent.v1.ListTorrentsResponse\x12T\n" +
+	"GetTorrent\x12\x1d.torrent.v1.GetTorrentRequest\x1a\x1e.torrent.v1.GetTorrentResponse\x12T\n" +
 	"\rCreateTorrent\x12 .torrent.v1.CreateTorrentRequest\x1a!.torrent.v1.CreateTorrentResponse\x12T\n" +
-	"\rDeleteTorrent\x12 .torrent.v1.DeleteTorrentRequest\x1a!.torrent.v1.DeleteTorrentResponseB7Z5github.com/monstrong/gracker2/proto/gen/go/torrent/v1b\x06proto3"
+	"\rDeleteTorrent\x12 .torrent.v1.DeleteTorrentRequest\x1a!.torrent.v1.DeleteTorrentResponse\x12Q\n" +
+	"\fListTorrents\x12\x1f.torrent.v1.ListTorrentsRequest\x1a .torrent.v1.ListTorrentsResponseB7Z5github.com/monstrong/gracker2/proto/gen/go/torrent/v1b\x06proto3"
 
 var (
 	file_proto_torrent_v1_torrent_proto_rawDescOnce sync.Once
@@ -612,13 +612,13 @@ var file_proto_torrent_v1_torrent_proto_depIdxs = []int32{
 	9, // 3: torrent.v1.Torrent.created_at:type_name -> google.protobuf.Timestamp
 	9, // 4: torrent.v1.Torrent.updated_at:type_name -> google.protobuf.Timestamp
 	0, // 5: torrent.v1.TorrentService.GetTorrent:input_type -> torrent.v1.GetTorrentRequest
-	2, // 6: torrent.v1.TorrentService.ListTorrents:input_type -> torrent.v1.ListTorrentsRequest
-	4, // 7: torrent.v1.TorrentService.CreateTorrent:input_type -> torrent.v1.CreateTorrentRequest
-	6, // 8: torrent.v1.TorrentService.DeleteTorrent:input_type -> torrent.v1.DeleteTorrentRequest
+	4, // 6: torrent.v1.TorrentService.CreateTorrent:input_type -> torrent.v1.CreateTorrentRequest
+	6, // 7: torrent.v1.TorrentService.DeleteTorrent:input_type -> torrent.v1.DeleteTorrentRequest
+	2, // 8: torrent.v1.TorrentService.ListTorrents:input_type -> torrent.v1.ListTorrentsRequest
 	1, // 9: torrent.v1.TorrentService.GetTorrent:output_type -> torrent.v1.GetTorrentResponse
-	3, // 10: torrent.v1.TorrentService.ListTorrents:output_type -> torrent.v1.ListTorrentsResponse
-	5, // 11: torrent.v1.TorrentService.CreateTorrent:output_type -> torrent.v1.CreateTorrentResponse
-	7, // 12: torrent.v1.TorrentService.DeleteTorrent:output_type -> torrent.v1.DeleteTorrentResponse
+	5, // 10: torrent.v1.TorrentService.CreateTorrent:output_type -> torrent.v1.CreateTorrentResponse
+	7, // 11: torrent.v1.TorrentService.DeleteTorrent:output_type -> torrent.v1.DeleteTorrentResponse
+	3, // 12: torrent.v1.TorrentService.ListTorrents:output_type -> torrent.v1.ListTorrentsResponse
 	9, // [9:13] is the sub-list for method output_type
 	5, // [5:9] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
