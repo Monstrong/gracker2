@@ -31,12 +31,12 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal("some error loading config")
+		log.Fatal(err)
 	}
 
 	l, err := logger.New(&cfg.Logger)
 	if err != nil {
-		log.Fatal("some error creating logger")
+		log.Fatal(err)
 	}
 	
 	l.Info(ctx, "config & logger init complete")
@@ -116,7 +116,7 @@ func main() {
 
 		select {
 		case <-AllStopped:
-			l.Info(ctx, "shut down gracefully")
+			
 		case <-timeout.Done():
 			l.Error(ctx, "shut down by timeout")
 			grpcServer.Stop()

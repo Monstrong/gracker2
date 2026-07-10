@@ -1,0 +1,13 @@
+app:
+  name: user-service
+  port: 50051
+  infra-port: 8080
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_users
+  max_conns: 10
+  ssl_mode: disable
+logger:
+  level: local

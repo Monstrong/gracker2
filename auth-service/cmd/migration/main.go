@@ -1,4 +1,4 @@
-package main
+package migration
 
 import (
 	"errors"
@@ -11,10 +11,8 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/monstrong/gracker2/torrent-service/internal/config"
+	"github.com/monstrong/auth-service/internal/config"
 )
-
-
 
 func main() {
 	cfg, err := config.Load()

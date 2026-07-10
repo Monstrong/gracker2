@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/gracker2/torrent-service/internal/config"
+	"github.com/monstrong/auth-service/internal/config"
 )
 
 func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	connStr := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s pool_max_conns=%d",
 		cfg.Host,
@@ -20,14 +23,11 @@ func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
 		cfg.SSLMode,
 		cfg.MaxConns,
 	)
-	
-	pool, err := pgxpool.New(context.Background(), connStr)
+
+	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		return nil, fmt.Errorf("error making pool: %w", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
@@ -35,4 +35,5 @@ func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+
 }
