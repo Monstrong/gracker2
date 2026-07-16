@@ -64,12 +64,12 @@ func main() {
 	g, errgr_ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.App.Port))
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Grpc.Port))
 		if err != nil {
 			l.Error(ctx, "grpc server starting", logger.Error(err))
 			return err
 		}
-		l.Info(ctx, "grpc server starting", logger.Int("port", cfg.App.Port))
+		l.Info(ctx, "grpc server starting", logger.Int("port", cfg.Grpc.Port))
 		return grpcServer.Serve(lis)
 	})
 	g.Go(func() error {
@@ -162,7 +162,7 @@ func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *h
 	mux.Handle("/metrics", promhttp.Handler())
 
 	return &http.Server{
-		Addr: fmt.Sprintf(":%d", cfg.App.InfraPort),
+		Addr: fmt.Sprintf(":%d", cfg.Infra),
 		Handler: mux,
 	}
 }
