@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/monstrong/gracker2/auth-service/internal/config"
 	"github.com/monstrong/gracker2/auth-service/internal/interceptors"
@@ -43,7 +44,7 @@ func main() {
 	pool, err := db.NewPool(&cfg.Postgres)
 	if err != nil {
 		l.Error(ctx, "creating db pool and doing Ping", logger.Error(err))
-		os.Exit(1)
+		panic(fmt.Sprintf("error creating db pool and doing Ping: %w", err)) // panic вместо log.Fatal чтобы defer выполнился.
 	}
 	defer pool.Close()
 	l.Info(ctx, "db pool init complete")
@@ -57,7 +58,7 @@ func main() {
 			interceptors.LoggingInterceptor(l), 
 			interceptors.RecoveryInterceptor(l),
 		))
-	pb.RegisterTorrentServiceServer(grpcServer, handler)
+	pb.RegisterAuthServiceServer(grpcServer, handler)
 
 	httpServer := infraServerInit(pool, cfg, l)
 	g, errgr_ctx := errgroup.WithContext(ctx)

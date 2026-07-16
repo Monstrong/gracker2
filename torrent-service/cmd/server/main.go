@@ -20,9 +20,9 @@ import (
 	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
 	"github.com/monstrong/gracker2/torrent-service/pkg/db"
 	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -38,17 +38,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	l.Info(ctx, "config & logger init complete")
 	defer func() {
-        l.Sync()
-    }()
+		l.Sync()
+	}()
 
 	// makes pool and does Ping
 	pool, err := db.NewPool(&cfg.Postgres)
 	if err != nil {
 		l.Error(ctx, "creating db pool and doing Ping", logger.Error(err))
-		os.Exit(1)
+		panic(fmt.Sprintf("failed to create db pool: %v", err)) // panic вместо log.Fatal чтобы defer выполнился.
 	}
 	defer pool.Close()
 	l.Info(ctx, "db pool init complete")
@@ -59,8 +59,9 @@ func main() {
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptors.LoggingInterceptor(l), 
 			interceptors.RecoveryInterceptor(l),
+			interceptors.LoggingInterceptor(l),
+			interceptors.TimeoutInterceptor(&cfg.Grpc),
 		))
 	pb.RegisterTorrentServiceServer(grpcServer, handler)
 
@@ -68,12 +69,12 @@ func main() {
 	g, errgr_ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.App.Port))
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Grpc.Port))
 		if err != nil {
 			l.Error(ctx, "grpc server starting", logger.Error(err))
 			return err
 		}
-		l.Info(ctx, "grpc server starting", logger.Int("port", cfg.App.Port))
+		l.Info(ctx, "grpc server starting", logger.Int("port", cfg.Grpc.Port))
 		return grpcServer.Serve(lis)
 	})
 	g.Go(func() error {
@@ -85,13 +86,13 @@ func main() {
 		signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 		select {
-        case <-shutdown:
-            l.Info(ctx, "signal received, starting graceful shutdown")
-        case <-errgr_ctx.Done():
-            l.Info(ctx, "errgroup context done, forcing shutdown")
-        }
+		case <-shutdown:
+			l.Info(ctx, "signal received, starting graceful shutdown")
+		case <-errgr_ctx.Done():
+			l.Info(ctx, "errgroup context done, forcing shutdown")
+		}
 
-		timeout, cancel := context.WithTimeout(ctx, 15 * time.Second)
+		timeout, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		GrpcStopped := make(chan struct{})
 		HttpStopped := make(chan struct{})
@@ -107,7 +108,7 @@ func main() {
 			l.Info(ctx, "http server stopped gracefully")
 			close(HttpStopped)
 		}()
-		go func ()  {
+		go func() {
 			<-GrpcStopped
 			<-HttpStopped
 
@@ -116,7 +117,7 @@ func main() {
 
 		select {
 		case <-AllStopped:
-			
+
 		case <-timeout.Done():
 			l.Error(ctx, "shut down by timeout")
 			grpcServer.Stop()
@@ -125,9 +126,6 @@ func main() {
 		return nil
 	})
 
-
-	
-	
 	if err := g.Wait(); err != nil {
 		if err == http.ErrServerClosed {
 			l.Info(ctx, "torrent-service stopped gracefully")
@@ -138,7 +136,6 @@ func main() {
 		l.Info(ctx, "torrent-service stopped gracefully")
 	}
 }
-
 
 func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
 	mux := http.NewServeMux()
@@ -166,7 +163,7 @@ func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *h
 	mux.Handle("/metrics", promhttp.Handler())
 
 	return &http.Server{
-		Addr: fmt.Sprintf(":%d", cfg.App.InfraPort),
+		Addr:    fmt.Sprintf(":%d", cfg.Infra.Port),
 		Handler: mux,
 	}
 }

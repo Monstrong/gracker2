@@ -1,8 +1,8 @@
 go 1.26.2
 
 use (
-    ./torrent-service
-    ./api-gateway
-    ./auth-service
-    ./proto
+	./api-gateway
+	./auth-service
+	./proto
+	./torrent-service
 )

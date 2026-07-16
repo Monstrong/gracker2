@@ -1,7 +1,10 @@
-app:
+grpc:
   name: torrent-service
   port: 50051
-  infra-port: 8080
+  timeout: 5s
+infra:
+  name: infra
+  port: 8080
 postgres:
   host: localhost
   port: 5432

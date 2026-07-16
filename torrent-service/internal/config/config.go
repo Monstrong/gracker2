@@ -3,29 +3,37 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	App      `mapstructure:"app" yaml:"app"`
+	Grpc     `mapstructure:"grpc" yaml:"grpc"`
+	Infra    `mapstructure:"infra" yaml:"infra"`
 	Postgres `mapstructure:"postgres" yaml:"postgres"`
 	Logger   `mapstructure:"logger" yaml:"logger"`
 }
 
-type App struct {
-	Name string `mapstructure:"name" yaml:"name"`
-	Port int    `mapstructure:"port" yaml:"port"`
-	InfraPort int `mapstructure:"infra-port" yaml:"infra-port"`
+type Grpc struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
 }
+type Infra struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
 type Postgres struct {
 	Host     string `mapstructure:"host" yaml:"host"`
 	Port     int    `mapstructure:"port" yaml:"port"`
 	User     string `mapstructure:"user" yaml:"user"`
 	Password string
 	DBName   string `mapstructure:"dbname" yaml:"dbname"`
-	MaxConns   int    `mapstructure:"max_conns" yaml:"max_conns"`
+	MaxConns int    `mapstructure:"max_conns" yaml:"max_conns"`
 	SSLMode  string `mapstructure:"ssl_mode"`
 }
 type Logger struct {
