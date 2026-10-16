@@ -1,4 +1,4 @@
-package migration
+package main
 
 import (
 	"errors"
@@ -54,6 +54,9 @@ func main() {
 				os.Exit(1)
 			}
 			err = m.Steps(steps)
+		} else {
+			l.Error("add number of steps")
+			os.Exit(1)
 		}
 	default:
 		l.Error("wrong command")

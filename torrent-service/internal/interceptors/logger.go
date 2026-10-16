@@ -18,14 +18,13 @@ const DurationKey = "request-duration"
 
 func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 	return func(
-		ctx context.Context, 
-		req any, 
-		info *grpc.UnaryServerInfo, 
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
 		start := time.Now()
 		reqID := uuid.New().String()
-		
 
 		MD, _ := metadata.FromIncomingContext(ctx)
 		var traceID string
@@ -41,31 +40,56 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 			traceID = uuid.New().String()
 		}
 
-
 		ctx = logger.WithRequestID(ctx, reqID)
 		ctx = logger.WithTraceID(ctx, traceID)
 		res, err := handler(ctx, req)
 		duration := time.Since(start)
 
-		
-		// ErrInvalidData отдается без "обертки"
 		if err != nil {
+			var ve *models.ValidationError
 			switch {
-			case errors.Is(err, models.ErrNotFound):
+			case errors.As(err, &ve):
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
-				err = status.Error(codes.NotFound, models.ErrNotFound.Error())
-			case errors.Is(err, models.ErrInvalidData):
+			case errors.Is(err, models.ErrNotFound),
+				errors.Is(err, models.ErrAlreadyExists):
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
-				err = status.Error(codes.InvalidArgument, err.Error())
+			case errors.Is(err, context.DeadlineExceeded),
+				errors.Is(err, context.Canceled):
+				l.Warn(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			default:
 				l.Error(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
-				err = status.Error(codes.Internal, models.ErrInternal.Error())
 			}
 		} else {
-			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration),
-			)
+			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration))
 		}
+
+		err = toGRPCError(err) // значение меняется на статус код, для return
+
 		return res, err
 	}
 }
 
+func toGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var ve *models.ValidationError
+	if errors.As(err, &ve) {
+		return status.Error(codes.InvalidArgument, ve.Reason)
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	}
+	if errors.Is(err, context.Canceled) {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	if errors.Is(err, models.ErrNotFound) {
+		return status.Error(codes.NotFound, models.ErrNotFound.Error())
+	}
+	if errors.Is(err, models.ErrAlreadyExists) {
+		return status.Error(codes.AlreadyExists, models.ErrAlreadyExists.Error())
+	}
+	return status.Error(codes.Internal, models.ErrInternal.Error())
+}

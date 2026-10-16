@@ -54,8 +54,8 @@ func main() {
 	l.Info(ctx, "db pool init complete")
 
 	repo := repository.NewPostgresRepository(pool)
-	service := service.NewTorrentService(repo)
-	handler := transport.NewServer(service)
+	svc := service.NewTorrentService(repo)
+	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -66,7 +66,7 @@ func main() {
 	pb.RegisterTorrentServiceServer(grpcServer, handler)
 
 	httpServer := infraServerInit(pool, cfg, l)
-	g, errgr_ctx := errgroup.WithContext(ctx)
+	g, errgrCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Grpc.Port))
@@ -88,7 +88,7 @@ func main() {
 		select {
 		case <-shutdown:
 			l.Info(ctx, "signal received, starting graceful shutdown")
-		case <-errgr_ctx.Done():
+		case <-errgrCtx.Done():
 			l.Info(ctx, "errgroup context done, forcing shutdown")
 		}
 

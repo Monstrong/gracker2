@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/monstrong/gracker2/torrent-service/internal/models"
 )
@@ -46,7 +47,13 @@ func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*mo
 		&t.CreatedAt,
 		&t.UpdatedAt,
 	)
+
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // «есть ли в цепочке обёрток ошибка типа target?». Ошибка постгреса
+			return nil, fmt.Errorf("%s: %w", op, models.ErrAlreadyExists)
+
+		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	return t, nil
@@ -110,7 +117,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("%s: %w", op, models.ErrNotFound)
 		}
-		return nil, fmt.Errorf("%s:%w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	return &t, nil
 }
@@ -127,7 +134,7 @@ func (r *PostgresRepository) Delete(ctx context.Context, id uuid.UUID) (bool, er
 		return false, nil
 	case 1:
 		return true, nil
-	default:
-		return true, fmt.Errorf("%s: more than 1 rows deleted", op)
+	default: // тут можно вернуть "предупреждение", о том что удалилось больше одной записи
+		return true, nil
 	}
 }
