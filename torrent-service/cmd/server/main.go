@@ -13,13 +13,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
-	"github.com/monstrong/gracker2/torrent-service/internal/config"
-	"github.com/monstrong/gracker2/torrent-service/internal/interceptors"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
 	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
-	"github.com/monstrong/gracker2/torrent-service/pkg/db"
-	"github.com/monstrong/gracker2/torrent-service/pkg/logger"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"

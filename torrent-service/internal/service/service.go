@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errModels"
 	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 )
 
@@ -22,13 +23,13 @@ func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*
 
 	switch {
 	case torrent.Name == "":
-		return nil, &models.ValidationError{Field: "name", Reason: "'name' is required"}
+		return nil, &errModels.ValidationError{Field: "name", Reason: "'name' is required"}
 	case torrent.InfoHash == "":
-		return nil, &models.ValidationError{Field: "info_hash", Reason: "'info_hash' is required"}
+		return nil, &errModels.ValidationError{Field: "info_hash", Reason: "'info_hash' is required"}
 	case torrent.AuthorID == uuid.Nil:
-		return nil, &models.ValidationError{Field: "author_id", Reason: "'author_id' is required"}
+		return nil, &errModels.ValidationError{Field: "author_id", Reason: "'author_id' is required"}
 	case torrent.CategoryID == uuid.Nil:
-		return nil, &models.ValidationError{Field: "category_id", Reason: "'category_id' is required"}
+		return nil, &errModels.ValidationError{Field: "category_id", Reason: "'category_id' is required"}
 	}
 
 	m, err := s.r.Create(ctx, torrent)
@@ -42,7 +43,7 @@ func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error)
 	const op = "service.torrentService.delete"
 
 	if id == uuid.Nil {
-		return false, &models.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+		return false, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
 	}
 
 	isDeleted, err := s.r.Delete(ctx, id)
@@ -66,7 +67,7 @@ func (s *TorrentService) GetByID(ctx context.Context, id uuid.UUID) (*models.Tor
 	const op = "service.torrentService.getByID"
 
 	if id == uuid.Nil {
-		return nil, &models.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
 	}
 
 	m, err := s.r.GetByID(ctx, id)

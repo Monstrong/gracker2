@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
 	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errModels"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -24,7 +25,7 @@ func NewServer(s service.Service) *Server{
 func (s *Server) GetTorrent(ctx context.Context, in *pb.GetTorrentRequest) (*pb.GetTorrentResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &models.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
 	}
 
 	m, err := s.s.GetByID(ctx, id)
@@ -53,11 +54,11 @@ func (s *Server) ListTorrents(ctx context.Context, in *pb.ListTorrentsRequest) (
 func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest) (*pb.CreateTorrentResponse, error) {
 	authorID, err := uuid.Parse(in.GetAuthorId())
 	if err != nil {
-		return nil, &models.ValidationError{Field: "id", Reason: "invalid authorID id format"}
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid authorID id format"}
 	}
 	categoryID, err := uuid.Parse(in.GetCategoryId())
 	if err != nil {
-		return nil, &models.ValidationError{Field: "id", Reason: "invalid categoryID id format"}
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid categoryID id format"}
 	}
 	t := models.Torrent{Name: in.GetName(), 
 		Description: in.GetDescription(), 
@@ -77,7 +78,7 @@ func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest)
 func (s *Server) DeleteTorrent(ctx context.Context, in *pb.DeleteTorrentRequest) (*pb.DeleteTorrentResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &models.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
 	}
 
 	ok, err := s.s.Delete(ctx, id)

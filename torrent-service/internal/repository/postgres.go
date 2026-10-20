@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errModels"
 )
 
 type PostgresRepository struct {
@@ -51,7 +52,7 @@ func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*mo
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // «есть ли в цепочке обёрток ошибка типа target?». Ошибка постгреса
-			return nil, fmt.Errorf("%s: %w", op, models.ErrAlreadyExists)
+			return nil, fmt.Errorf("%s: %w", op, errModels.ErrAlreadyExists)
 
 		}
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -115,7 +116,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("%s: %w", op, models.ErrNotFound)
+			return nil, fmt.Errorf("%s: %w", op, errModels.ErrNotFound)
 		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
