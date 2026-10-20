@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/monstrong/gracker2/torrent-service/internal/config"
+	"github.com/monstrong/gracker2/pkg/config"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +21,7 @@ type Logger interface {
 	Debug(ctx context.Context, msg string, fields ...Field)
 	Error(ctx context.Context, msg string, fields ...Field)
 	Warn(ctx context.Context, msg string, fields ...Field)
-
+	Sync()
 }
 
 type L struct {

@@ -1,0 +1,24 @@
+syntax = "proto3";
+package auth.v1;
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
+
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+}
+
+message LoginRequest {
+  
+}
+
+message LoginResponse {
+  
+}
+
+message RegisterRequest {
+  
+}
+
+message RegisterResponse {
+  
+}

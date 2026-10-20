@@ -2,11 +2,11 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
 	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -20,10 +20,12 @@ func NewServer(s service.Service) *Server{
 	return &Server{s: s}
 }
 
+// Тут нет смысла добавлять "op" в ошибки. вызываемый метод уже известен клиенту
+
 func (s *Server) GetTorrent(ctx context.Context, in *pb.GetTorrentRequest) (*pb.GetTorrentResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid torrent id", models.ErrInvalidData)
+		return nil, &errs.ValidationError{Field: "id", Reason: "invalid torrent id format"}
 	}
 
 	m, err := s.s.GetByID(ctx, id)
@@ -50,19 +52,19 @@ func (s *Server) ListTorrents(ctx context.Context, in *pb.ListTorrentsRequest) (
 }
 
 func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest) (*pb.CreateTorrentResponse, error) {
-	author_id, err := uuid.Parse(in.GetAuthorId())
+	authorID, err := uuid.Parse(in.GetAuthorId())
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid format for author_id", models.ErrInvalidData)
+		return nil, &errs.ValidationError{Field: "authorID", Reason: "invalid authorID id format"}
 	}
-	category_id, err := uuid.Parse(in.GetCategoryId())
+	categoryID, err := uuid.Parse(in.GetCategoryId())
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid format for category_id", models.ErrInvalidData)
+		return nil, &errs.ValidationError{Field: "categoryID", Reason: "invalid categoryID id format"}
 	}
 	t := models.Torrent{Name: in.GetName(), 
 		Description: in.GetDescription(), 
 		InfoHash: in.GetInfoHash(), 
-		AuthorID: author_id,
-		CategoryID: category_id,
+		AuthorID: authorID,
+		CategoryID: categoryID,
 	}
 	m, err := s.s.Create(ctx, &t)
 	if err != nil{
@@ -76,7 +78,7 @@ func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest)
 func (s *Server) DeleteTorrent(ctx context.Context, in *pb.DeleteTorrentRequest) (*pb.DeleteTorrentResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid format for torrent id", models.ErrInvalidData)
+		return nil, &errs.ValidationError{Field: "id", Reason: "invalid torrent id format"}
 	}
 
 	ok, err := s.s.Delete(ctx, id)
