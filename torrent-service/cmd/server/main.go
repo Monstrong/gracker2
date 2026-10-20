@@ -11,22 +11,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+
 	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/pkg/logger"
+	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	"github.com/monstrong/gracker2/torrent-service/internal/app"
 	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
 	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
-	"github.com/monstrong/gracker2/pkg/db"
-	"github.com/monstrong/gracker2/pkg/logger"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
 func main() {
-
 	ctx := context.Background()
 
 	cfg, err := config.Load()
@@ -65,7 +64,7 @@ func main() {
 		))
 	pb.RegisterTorrentServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(pool, cfg, l)
+	httpServer := app.InfraServerInit(pool, cfg, l)
 	g, errgrCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -137,33 +136,3 @@ func main() {
 	}
 }
 
-func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := pool.Ping(ctx); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("ERROR"))
-			l.Error(ctx, "error on connection to db", logger.Error(err))
-		} else {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
-		}
-	})
-
-	mux.Handle("/metrics", promhttp.Handler())
-
-	return &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Infra.Port),
-		Handler: mux,
-	}
-}
