@@ -1,4 +1,4 @@
-package errModels
+package errs
 
 import "errors"
 

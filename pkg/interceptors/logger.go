@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/monstrong/gracker2/pkg/errModels"
+	"github.com/monstrong/gracker2/pkg/errs"
 	"github.com/monstrong/gracker2/pkg/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -46,12 +46,12 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 		duration := time.Since(start)
 
 		if err != nil {
-			var ve *errModels.ValidationError
+			var ve *errs.ValidationError
 			switch {
 			case errors.As(err, &ve):
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
-			case errors.Is(err, errModels.ErrNotFound),
-				errors.Is(err, errModels.ErrAlreadyExists):
+			case errors.Is(err, errs.ErrNotFound),
+				errors.Is(err, errs.ErrAlreadyExists):
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			case errors.Is(err, context.DeadlineExceeded),
 				errors.Is(err, context.Canceled):
@@ -74,7 +74,7 @@ func toGRPCError(err error) error {
 		return nil
 	}
 
-	var ve *errModels.ValidationError
+	var ve *errs.ValidationError
 	if errors.As(err, &ve) {
 		return status.Error(codes.InvalidArgument, ve.Reason)
 	}
@@ -85,11 +85,11 @@ func toGRPCError(err error) error {
 	if errors.Is(err, context.Canceled) {
 		return status.Error(codes.Canceled, err.Error())
 	}
-	if errors.Is(err, errModels.ErrNotFound) {
-		return status.Error(codes.NotFound, errModels.ErrNotFound.Error())
+	if errors.Is(err, errs.ErrNotFound) {
+		return status.Error(codes.NotFound, errs.ErrNotFound.Error())
 	}
-	if errors.Is(err, errModels.ErrAlreadyExists) {
-		return status.Error(codes.AlreadyExists, errModels.ErrAlreadyExists.Error())
+	if errors.Is(err, errs.ErrAlreadyExists) {
+		return status.Error(codes.AlreadyExists, errs.ErrAlreadyExists.Error())
 	}
-	return status.Error(codes.Internal, errModels.ErrInternal.Error())
+	return status.Error(codes.Internal, errs.ErrInternal.Error())
 }

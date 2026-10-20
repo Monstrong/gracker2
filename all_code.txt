@@ -1,0 +1,1689 @@
+=== FILE: ./api-gateway/cmd/server/main.go ===
+package main=== FILE: ./api-gateway/go.mod ===
+module github.com/monstrong/gracker2/api-gateway
+
+go 1.26.2
+=== FILE: ./README.md ===
+=== FILE: ./pkg/errModels/errors.go ===
+package errModels
+
+import "errors"
+
+var (
+	ErrNotFound      = errors.New("record not found")
+	ErrInternal      = errors.New("internal server error")
+	ErrAlreadyExists = errors.New("record already exists")
+)
+
+// new ErrInvalidData
+type ValidationError struct {
+	Field  string
+	Reason string
+}
+
+func (e *ValidationError) Error() string {
+	return e.Reason
+}
+=== FILE: ./pkg/db/postgres.go ===
+package db
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/config"
+)
+
+func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
+	connStr := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s pool_max_conns=%d",
+		cfg.Host,
+		cfg.Port,
+		cfg.User,
+		cfg.Password,
+		cfg.DBName,
+		cfg.SSLMode,
+		cfg.MaxConns,
+	)
+	
+	pool, err := pgxpool.New(context.Background(), connStr)
+	if err != nil {
+		return nil, fmt.Errorf("error making pool: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	return pool, nil
+}
+=== FILE: ./pkg/config/config.go ===
+package config
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+)
+
+type Config struct {
+	Grpc     `mapstructure:"grpc" yaml:"grpc"`
+	Infra    `mapstructure:"infra" yaml:"infra"`
+	Postgres `mapstructure:"postgres" yaml:"postgres"`
+	Logger   `mapstructure:"logger" yaml:"logger"`
+}
+
+type Grpc struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+type Infra struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Postgres struct {
+	Host     string `mapstructure:"host" yaml:"host"`
+	Port     int    `mapstructure:"port" yaml:"port"`
+	User     string `mapstructure:"user" yaml:"user"`
+	Password string
+	DBName   string `mapstructure:"dbname" yaml:"dbname"`
+	MaxConns int    `mapstructure:"max_conns" yaml:"max_conns"`
+	SSLMode  string `mapstructure:"ssl_mode"`
+}
+type Logger struct {
+	Level string `mapstructure:"level" yaml:"level"`
+}
+
+const configYamlPath = "config/config.yaml"
+const configEnvPath = "config/.env"
+const postgresPasswordName = "POSTGRES_PASSWORD"
+
+func Load() (*Config, error) {
+	cfg := &Config{}
+	v := viper.New()
+	v.SetConfigFile(configYamlPath)
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("error reading config.yaml:%w", err)
+	}
+
+	_ = godotenv.Load(configEnvPath)
+	v.AutomaticEnv()
+
+	if err := v.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
+
+	return cfg, nil
+}
+=== FILE: ./pkg/go.mod ===
+module github.com/monstrong/gracker2/pkg
+
+go 1.26.2
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/joho/godotenv v1.5.1
+	github.com/spf13/viper v1.21.0
+	go.uber.org/zap v1.28.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
+)
+=== FILE: ./pkg/interceptors/logger.go ===
+package interceptors
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/errModels"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+)
+
+const DurationKey = "request-duration"
+
+func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		start := time.Now()
+		reqID := uuid.New().String()
+
+		MD, _ := metadata.FromIncomingContext(ctx)
+		var traceID string
+		vals := MD.Get(string(logger.LoggerTraceIDKey))
+		if len(vals) > 0 {
+			if _, err := uuid.Parse(vals[0]); err != nil {
+				l.Error(ctx, info.FullMethod, logger.Error(err))
+				traceID = uuid.New().String()
+			} else {
+				traceID = vals[0]
+			}
+		} else {
+			traceID = uuid.New().String()
+		}
+
+		ctx = logger.WithRequestID(ctx, reqID)
+		ctx = logger.WithTraceID(ctx, traceID)
+		res, err := handler(ctx, req)
+		duration := time.Since(start)
+
+		if err != nil {
+			var ve *errModels.ValidationError
+			switch {
+			case errors.As(err, &ve):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			case errors.Is(err, errModels.ErrNotFound),
+				errors.Is(err, errModels.ErrAlreadyExists):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			case errors.Is(err, context.DeadlineExceeded),
+				errors.Is(err, context.Canceled):
+				l.Warn(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			default:
+				l.Error(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			}
+		} else {
+			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration))
+		}
+
+		err = toGRPCError(err) // значение меняется на статус код, для return
+
+		return res, err
+	}
+}
+
+func toGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var ve *errModels.ValidationError
+	if errors.As(err, &ve) {
+		return status.Error(codes.InvalidArgument, ve.Reason)
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	}
+	if errors.Is(err, context.Canceled) {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	if errors.Is(err, errModels.ErrNotFound) {
+		return status.Error(codes.NotFound, errModels.ErrNotFound.Error())
+	}
+	if errors.Is(err, errModels.ErrAlreadyExists) {
+		return status.Error(codes.AlreadyExists, errModels.ErrAlreadyExists.Error())
+	}
+	return status.Error(codes.Internal, errModels.ErrInternal.Error())
+}
+=== FILE: ./pkg/interceptors/recovery.go ===
+package interceptors
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/monstrong/gracker2/pkg/logger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+
+func RecoveryInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context, 
+		req any, 
+		info *grpc.UnaryServerInfo, 
+		handler grpc.UnaryHandler,
+		) (resp any, err error) {
+
+		defer func() {
+			if p := recover(); p != nil{
+				l.Error(ctx, "panic recovered",
+					logger.String("method", info.FullMethod),
+					logger.String("panic", fmt.Sprintf("%v", p)),
+				)
+
+				// подмена ошибки чтобы пользователь не увидел её текст
+				// это - то, для чего здесь возвращаемые параметры проименнованы
+				err = status.Error(codes.Internal, "internal server error") 
+			}
+		}()
+		return handler(ctx, req)
+	}
+}=== FILE: ./pkg/interceptors/timeoutAdder.go ===
+package interceptors
+
+import (
+	"context"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"google.golang.org/grpc"
+)
+
+func TimeoutInterceptor(cfg *config.Grpc) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context, 
+		req any, 
+		info *grpc.UnaryServerInfo, 
+		handler grpc.UnaryHandler,
+		) (resp any, err error) {
+
+		if _, ok := ctx.Deadline(); ok {
+			return handler(ctx, req)
+		}
+
+		ctxNew, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+		
+		return handler(ctxNew, req)
+			
+	}
+}=== FILE: ./pkg/logger/zap.go ===
+package logger
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"go.uber.org/zap"
+)
+
+type contextKey string
+
+const (
+	LoggerRequestIDKey contextKey = "x-request-id"
+	LoggerTraceIDKey   contextKey = "x-trace-id"
+)
+
+type Logger interface {
+	Info(ctx context.Context, msg string, fields ...Field)
+	Debug(ctx context.Context, msg string, fields ...Field)
+	Error(ctx context.Context, msg string, fields ...Field)
+	Warn(ctx context.Context, msg string, fields ...Field)
+
+}
+
+type L struct {
+	z *zap.Logger
+}
+
+type Field = zap.Field
+
+
+func New(cfg *config.Logger) (*L, error) {
+
+	var logger *zap.Logger
+	var err error
+	var invalidLevel bool = false
+
+	switch cfg.Level {
+	case "dev", "development", "local":
+		logger, err = zap.NewDevelopment()
+	case "prod", "production":
+		logger, err = zap.NewProduction()
+	default:
+		logger, err = zap.NewProduction()
+		invalidLevel = true
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("creating logger:%w", err)
+	}
+
+	if invalidLevel {
+		logger.Warn("invalid logger level in config, fallback to production")
+		return &L{z: logger}, nil
+	}
+
+	return &L{z: logger}, nil
+}
+
+
+func WithRequestID (ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, LoggerRequestIDKey, id)
+}
+func WithTraceID (ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, LoggerTraceIDKey, id)
+}
+
+func (l *L) extractContextID (ctx context.Context) *zap.Logger{
+	logger := l.z
+	if reqID, ok := ctx.Value(LoggerRequestIDKey).(string); ok {
+		logger = logger.With(zap.String("x-request-id", reqID))
+	}
+
+	if traceID, ok := ctx.Value(LoggerTraceIDKey).(string); ok {
+		logger = logger.With(zap.String("x-trace-id", traceID))
+	}
+
+
+	return logger
+}
+
+func (l *L) Info(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Info(msg, fields...)
+}
+
+func (l *L) Warn(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Warn(msg, fields...)
+}
+
+func (l *L) Debug(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Debug(msg, fields...)
+}
+
+func (l *L) Error(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Error(msg, fields...)
+}
+
+func (l *L) Sync() {
+	_ = l.z.Sync()
+}
+
+func String(key string, val string) Field {
+	return zap.String(key, val)
+}
+
+func Int(key string, val int) Field {
+	return zap.Int(key, val)
+}
+
+func Duration(key string, val time.Duration) Field {
+	return zap.Duration(key, val)
+}
+
+func Error(err error) Field {
+	return zap.Error(err)
+}=== FILE: ./.gitignore ===
+.env
+*.env
+!.env.example=== FILE: ./docker-compose.yml ===
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gracker_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+volumes:
+  pgdata:=== FILE: ./proto/auth/v1/auth.proto ===
+syntax = "proto3";
+package auth.v1;
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
+
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+}
+
+message LoginRequest {
+  
+}
+
+message LoginResponse {
+  
+}
+
+message RegisterRequest {
+  
+}
+
+message RegisterResponse {
+  
+}=== FILE: ./proto/go.mod ===
+module github.com/monstrong/gracker2/proto
+
+go 1.26.2
+
+require (
+	google.golang.org/grpc v1.81.1
+	google.golang.org/protobuf v1.36.11
+)
+
+require (
+	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
+)
+=== FILE: ./proto/torrent/v1/torrent.proto ===
+syntax = "proto3";
+package torrent.v1;
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/torrent/v1";
+
+import "google/protobuf/timestamp.proto";
+service TorrentService {
+  rpc GetTorrent(GetTorrentRequest) returns (GetTorrentResponse);
+  rpc CreateTorrent(CreateTorrentRequest) returns (CreateTorrentResponse);
+  rpc DeleteTorrent(DeleteTorrentRequest) returns (DeleteTorrentResponse);
+  rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
+}
+
+message GetTorrentRequest {
+  string id = 1;
+}
+
+message GetTorrentResponse {
+  Torrent torrent = 1;
+}
+
+message ListTorrentsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListTorrentsResponse {
+  repeated Torrent torrents = 1;
+}
+
+message CreateTorrentRequest {
+  string name = 1;
+  string description = 2;
+  string info_hash = 3;
+  string author_id = 4;
+  string category_id = 5;
+}
+
+message CreateTorrentResponse {
+  Torrent torrent = 1;
+}
+
+message DeleteTorrentRequest {
+  string id = 1;
+}
+message DeleteTorrentResponse {
+  bool deleted = 1;
+}
+message Torrent {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string info_hash = 4;
+  string author_id = 5;
+  string category_id = 6;
+  int32 status = 7;
+  int64 downloads = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+=== FILE: ./.env.example ===
+POSTGRES_PASSWORD==== FILE: ./scripts/init-db.sql ===
+CREATE DATABASE gracker_torrents;=== FILE: ./torrent-service/cmd/server/main.go ===
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/torrent-service/internal/repository"
+	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+)
+
+func main() {
+
+	ctx := context.Background()
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	l, err := logger.New(&cfg.Logger)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	l.Info(ctx, "config & logger init complete")
+	defer func() {
+		l.Sync()
+	}()
+
+	// makes pool and does Ping
+	pool, err := db.NewPool(&cfg.Postgres)
+	if err != nil {
+		l.Error(ctx, "creating db pool and doing Ping", logger.Error(err))
+		panic(fmt.Sprintf("failed to create db pool: %v", err)) // panic вместо log.Fatal чтобы defer выполнился.
+	}
+	defer pool.Close()
+	l.Info(ctx, "db pool init complete")
+
+	repo := repository.NewPostgresRepository(pool)
+	svc := service.NewTorrentService(repo)
+	handler := transport.NewServer(svc)
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptors.RecoveryInterceptor(l),
+			interceptors.LoggingInterceptor(l),
+			interceptors.TimeoutInterceptor(&cfg.Grpc),
+		))
+	pb.RegisterTorrentServiceServer(grpcServer, handler)
+
+	httpServer := infraServerInit(pool, cfg, l)
+	g, errgrCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Grpc.Port))
+		if err != nil {
+			l.Error(ctx, "grpc server starting", logger.Error(err))
+			return err
+		}
+		l.Info(ctx, "grpc server starting", logger.Int("port", cfg.Grpc.Port))
+		return grpcServer.Serve(lis)
+	})
+	g.Go(func() error {
+		l.Info(ctx, "http infra server starting")
+		return httpServer.ListenAndServe()
+	})
+	g.Go(func() error {
+		shutdown := make(chan os.Signal, 1)
+		signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+
+		select {
+		case <-shutdown:
+			l.Info(ctx, "signal received, starting graceful shutdown")
+		case <-errgrCtx.Done():
+			l.Info(ctx, "errgroup context done, forcing shutdown")
+		}
+
+		timeout, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		GrpcStopped := make(chan struct{})
+		HttpStopped := make(chan struct{})
+
+		AllStopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			l.Info(ctx, "grpc server stopped gracefully")
+			close(GrpcStopped)
+		}()
+		go func() {
+			httpServer.Shutdown(context.Background())
+			l.Info(ctx, "http server stopped gracefully")
+			close(HttpStopped)
+		}()
+		go func() {
+			<-GrpcStopped
+			<-HttpStopped
+
+			close(AllStopped)
+		}()
+
+		select {
+		case <-AllStopped:
+
+		case <-timeout.Done():
+			l.Error(ctx, "shut down by timeout")
+			grpcServer.Stop()
+			httpServer.Close()
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		if err == http.ErrServerClosed {
+			l.Info(ctx, "torrent-service stopped gracefully")
+		} else {
+			l.Error(ctx, "torrent-service stopped with error", logger.Error(err))
+		}
+	} else {
+		l.Info(ctx, "torrent-service stopped gracefully")
+	}
+}
+
+func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("ERROR"))
+			l.Error(ctx, "error on connection to db", logger.Error(err))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}
+	})
+
+	mux.Handle("/metrics", promhttp.Handler())
+
+	return &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.Infra.Port),
+		Handler: mux,
+	}
+}
+=== FILE: ./torrent-service/cmd/migrate/main.go ===
+package main
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/monstrong/gracker2/pkg/config"
+)
+
+
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.Postgres.User, 
+		cfg.Postgres.Password, 
+		cfg.Postgres.Host,
+		cfg.Postgres.Port,
+		cfg.Postgres.DBName,
+		cfg.Postgres.SSLMode,
+	)
+
+	m, err := migrate.New("file://migrations", dsn)
+	if err != nil {
+		l.Error("error creating migration", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if len(os.Args) < 2 {
+		l.Error("add command")
+		os.Exit(1)
+	}
+	comand := os.Args[1]
+	switch comand {
+	case "up":
+		err = m.Up()
+	case "down":
+		err = m.Down()
+	case "step":
+		if len(os.Args) > 2 && os.Args[2] != "" {
+			steps, parseErr := strconv.Atoi(os.Args[2])
+			if parseErr != nil {
+				l.Error("error converting steps to int", slog.String("error", parseErr.Error()))
+				os.Exit(1)
+			}
+			err = m.Steps(steps)
+		} else {
+			l.Error("add number of steps")
+			os.Exit(1)
+		}
+	default:
+		l.Error("wrong command")
+		os.Exit(1)
+	}
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			l.Info("database is already up")
+		} else {
+			l.Error("error doing migration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}
+}=== FILE: ./torrent-service/TODO.md ===
+1. реализовать Update с частичным обновлением
+2. реализовать List с любыми фильтрами и редактируемым ORDER BY
+3. Умный поиск
+
+=== FILE: ./torrent-service/config/.env.example ===
+POSTGRES_PASSWORD==== FILE: ./torrent-service/config/config.yaml ===
+grpc:
+  name: torrent-service
+  port: 50051
+  timeout: 5s
+infra:
+  name: infra
+  port: 8080
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_torrents
+  max_conns: 10
+  ssl_mode: disable
+logger:
+  level: local=== FILE: ./torrent-service/migrations/000001_create_torrents.up.sql ===
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS torrents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    info_hash VARCHAR(64) NOT NULL UNIQUE,
+    status SMALLINT NOT NULL DEFAULT 0,
+    author_id UUID NOT NULL,
+    category_id UUID NOT NULL,
+    downloads INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+=== FILE: ./torrent-service/migrations/000001_create_torrents.down.sql ===
+DROP TABLE IF EXISTS torrents;
+=== FILE: ./torrent-service/go.mod ===
+module github.com/monstrong/gracker2/torrent-service
+
+go 1.26.2
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/monstrong/gracker2/pkg v0.0.0-00010101000000-000000000000
+	github.com/monstrong/gracker2/proto v0.1.0
+	google.golang.org/grpc v1.84.0
+	google.golang.org/protobuf v1.36.11
+)
+
+require (
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/lib/pq v1.10.9 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/spf13/viper v1.21.0 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+)
+
+require (
+	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/prometheus/client_golang v1.23.2
+	go.uber.org/zap v1.28.0 // indirect
+	golang.org/x/sync v0.22.0
+	golang.org/x/text v0.40.0 // indirect
+)
+
+replace github.com/monstrong/gracker2/pkg => ../pkg
+
+replace github.com/monstrong/gracker2/proto => ../proto
+=== FILE: ./torrent-service/internal/service/interface.go ===
+package service
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+)
+
+type Service interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error)
+	List(ctx context.Context, limit, offset int) ([]*models.Torrent, error)
+	Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error)
+	Delete(ctx context.Context, id uuid.UUID) (bool, error)
+}
+=== FILE: ./torrent-service/internal/service/service.go ===
+package service
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errModels"
+	"github.com/monstrong/gracker2/torrent-service/internal/repository"
+)
+
+type TorrentService struct {
+	r repository.Repository
+}
+
+func NewTorrentService(r repository.Repository) *TorrentService {
+	return &TorrentService{r: r}
+}
+
+func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error) {
+	const op = "service.torrentService.create"
+
+	switch {
+	case torrent.Name == "":
+		return nil, &errModels.ValidationError{Field: "name", Reason: "'name' is required"}
+	case torrent.InfoHash == "":
+		return nil, &errModels.ValidationError{Field: "info_hash", Reason: "'info_hash' is required"}
+	case torrent.AuthorID == uuid.Nil:
+		return nil, &errModels.ValidationError{Field: "author_id", Reason: "'author_id' is required"}
+	case torrent.CategoryID == uuid.Nil:
+		return nil, &errModels.ValidationError{Field: "category_id", Reason: "'category_id' is required"}
+	}
+
+	m, err := s.r.Create(ctx, torrent)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return m, nil
+}
+
+func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "service.torrentService.delete"
+
+	if id == uuid.Nil {
+		return false, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	isDeleted, err := s.r.Delete(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return isDeleted, nil
+}
+
+func (s *TorrentService) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
+	const op = "service.torrentService.list"
+
+	ms, err := s.r.List(ctx, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return ms, nil
+}
+
+func (s *TorrentService) GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error) {
+	const op = "service.torrentService.getByID"
+
+	if id == uuid.Nil {
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	m, err := s.r.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return m, nil
+}
+=== FILE: ./torrent-service/internal/repository/interface.go ===
+package repository
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+)
+
+type Repository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error)
+	List(ctx context.Context, limit, offset int) ([]*models.Torrent, error)
+	Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error)
+	Delete(ctx context.Context, id uuid.UUID) (bool, error)
+}
+=== FILE: ./torrent-service/internal/repository/postgres.go ===
+package repository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errModels"
+)
+
+type PostgresRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
+	return &PostgresRepository{
+		db: db,
+	}
+}
+
+func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*models.Torrent, error) {
+	const op = "repo.postgres.create"
+	query := `
+	INSERT INTO torrents (name, description, info_hash, author_id, category_id)
+	VALUES ($1, $2, $3, $4, $5)
+	RETURNING id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at
+	`
+	err := r.db.QueryRow(ctx, query,
+		t.Name,
+		t.Description,
+		t.InfoHash,
+		t.AuthorID,
+		t.CategoryID,
+	).Scan(
+		&t.ID,
+		&t.Name,
+		&t.Description,
+		&t.InfoHash,
+		&t.Status,
+		&t.AuthorID,
+		&t.CategoryID,
+		&t.Downloads,
+		&t.CreatedAt,
+		&t.UpdatedAt,
+	)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // «есть ли в цепочке обёрток ошибка типа target?». Ошибка постгреса
+			return nil, fmt.Errorf("%s: %w", op, errModels.ErrAlreadyExists)
+
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return t, nil
+
+}
+
+func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
+	const op = "repo.postgres.list"
+	var ts []*models.Torrent
+	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents 
+	ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := r.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var t models.Torrent
+		err := rows.Scan(
+			&t.ID,
+			&t.Name,
+			&t.Description,
+			&t.InfoHash,
+			&t.Status,
+			&t.AuthorID,
+			&t.CategoryID,
+			&t.Downloads,
+			&t.CreatedAt,
+			&t.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		ts = append(ts, &t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return ts, nil
+}
+
+func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error) {
+	const op = "repo.postgres.getbyid"
+
+	var t models.Torrent
+	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents WHERE id = $1`
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&t.ID,
+		&t.Name,
+		&t.Description,
+		&t.InfoHash,
+		&t.Status,
+		&t.AuthorID,
+		&t.CategoryID,
+		&t.Downloads,
+		&t.CreatedAt,
+		&t.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errModels.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &t, nil
+}
+
+func (r *PostgresRepository) Delete(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "repo.postgres.delete"
+
+	tag, err := r.db.Exec(ctx, `DELETE FROM torrents WHERE id = $1`, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	switch tag.RowsAffected() {
+	case 0:
+		return false, nil
+	case 1:
+		return true, nil
+	default: // тут можно вернуть "предупреждение", о том что удалилось больше одной записи
+		return true, nil
+	}
+}
+=== FILE: ./torrent-service/internal/transport/grpc/grpc.go ===
+package grpc
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errModels"
+	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+type Server struct {
+	pb.UnimplementedTorrentServiceServer
+	s service.Service
+}
+
+func NewServer(s service.Service) *Server{
+	return &Server{s: s}
+}
+
+// Тут нет смысла добавлять "op" в ошибки. вызываемый метод уже известен клиенту
+
+func (s *Server) GetTorrent(ctx context.Context, in *pb.GetTorrentRequest) (*pb.GetTorrentResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	m, err := s.s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GetTorrentResponse{Torrent: toProto(m)}, nil
+}
+
+func (s *Server) ListTorrents(ctx context.Context, in *pb.ListTorrentsRequest) (*pb.ListTorrentsResponse, error) {
+	ms, err := s.s.List(ctx, int(in.GetLimit()), int(in.GetOffset()))
+	if err != nil {
+		return nil, err
+	}
+	pbTorrents := make([]*pb.Torrent, 0, len(ms))
+
+	for _, m := range ms {
+		pbTorrent := toProto(m)
+		pbTorrents = append(pbTorrents, pbTorrent)
+	}
+
+	return &pb.ListTorrentsResponse{Torrents: pbTorrents}, nil
+}
+
+func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest) (*pb.CreateTorrentResponse, error) {
+	authorID, err := uuid.Parse(in.GetAuthorId())
+	if err != nil {
+		return nil, &errModels.ValidationError{Field: "authorID", Reason: "invalid authorID id format"}
+	}
+	categoryID, err := uuid.Parse(in.GetCategoryId())
+	if err != nil {
+		return nil, &errModels.ValidationError{Field: "categoryID", Reason: "invalid categoryID id format"}
+	}
+	t := models.Torrent{Name: in.GetName(), 
+		Description: in.GetDescription(), 
+		InfoHash: in.GetInfoHash(), 
+		AuthorID: authorID,
+		CategoryID: categoryID,
+	}
+	m, err := s.s.Create(ctx, &t)
+	if err != nil{
+		return nil, err
+	}
+
+	return &pb.CreateTorrentResponse{Torrent: toProto(m)}, nil
+}
+
+
+func (s *Server) DeleteTorrent(ctx context.Context, in *pb.DeleteTorrentRequest) (*pb.DeleteTorrentResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	ok, err := s.s.Delete(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DeleteTorrentResponse{Deleted: ok}, nil
+}
+
+
+func toProto(m *models.Torrent) *pb.Torrent {
+	return &pb.Torrent{
+		Id: m.ID.String(), 
+		Name: m.Name,
+		Description: m.Description,
+		InfoHash: m.InfoHash,
+		AuthorId: m.AuthorID.String(),
+		CategoryId: m.CategoryID.String(),
+		Status: int32(m.Status),
+		Downloads: int64(m.Downloads),
+		CreatedAt: timestamppb.New(m.CreatedAt),
+		UpdatedAt: timestamppb.New(m.UpdatedAt),
+	}
+}=== FILE: ./torrent-service/internal/models/torrent.go ===
+package models
+
+import (
+	"github.com/google/uuid"
+	"time"
+)
+
+type Torrent struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Description string    `db:"description"`
+	InfoHash    string    `db:"info_hash"`
+	Status      int       `db:"status"`
+	AuthorID    uuid.UUID `db:"author_id"`
+	CategoryID  uuid.UUID `db:"category_id"`
+	Downloads   int       `db:"downloads"`
+	CreatedAt   time.Time `db:"created_at"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+=== FILE: ./torrent-service/Makefile ===
+include config/.env
+export
+
+.PHONY: migrate-up migrate-down migrate-step migrate-step-down run
+
+migrate-up:
+	go run ./cmd/migrate up
+
+migrate-down:
+	go run ./cmd/migrate down
+
+migrate-step:
+	go run ./cmd/migrate step 1
+
+migrate-step-down:
+	go run ./cmd/migrate step -1
+
+run:
+	go run ./cmd/server=== FILE: ./all_code.txt ===
+=== FILE: ./Makefile ===
+.PHONY: proto proto-clean $(addprefix proto-,$(SERVICES))
+
+# да, этот файл я сгенерил в нейронке
+
+MODULE := github.com/monstrong/gracker2
+PROTO_OPTS := --go_out=. --go_opt=module=$(MODULE) --go-grpc_out=. --go-grpc_opt=module=$(MODULE)
+
+# Список сервисов
+SERVICES := torrent auth
+
+# Версия по умолчанию - последняя (находим максимальную)
+LATEST_VERSION := $(shell ls -d proto/*/v* 2>/dev/null | sed 's/.*\/v//' | sort -n | tail -1)
+VERSION ?= v$(LATEST_VERSION)
+
+# Если VERSION не задана и нет папок, ставим v1
+ifeq ($(VERSION),)
+VERSION := v1
+endif
+
+# Все proto файлы
+PROTO_FILES := $(foreach s,$(SERVICES),proto/$(s)/$(VERSION)/$(s).proto)
+
+proto: $(PROTO_FILES)
+	@echo "Генерация для версии $(VERSION)"
+	@protoc -I. $(PROTO_OPTS) $^
+
+# Генерация для конкретного сервиса
+$(addprefix proto-,$(SERVICES)): proto-%:
+	@echo "Генерация $* для версии $(VERSION)"
+	@protoc -I. $(PROTO_OPTS) proto/$*/$(VERSION)/$*.proto
+
+proto-clean:
+	@rm -rf proto/gen/go
+
+proto-versions:
+	@echo "Доступные версии:"
+	@ls -d proto/*/v* 2>/dev/null | sed 's/.*\/v//' | sort -n | uniq=== FILE: ./auth-service/cmd/server/main.go ===
+package server
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+)
+
+func main() {	
+	ctx := context.Background()
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	l, err := logger.New(&cfg.Logger)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	l.Info(ctx, "config & logger init complete")
+	defer func() {
+        l.Sync()
+    }()
+
+	// makes pool and does Ping
+	pool, err := db.NewPool(&cfg.Postgres)
+	if err != nil {
+		l.Error(ctx, "creating db pool and doing Ping", logger.Error(err))
+		panic(fmt.Sprintf("error creating db pool and doing Ping: %w", err)) // panic вместо log.Fatal чтобы defer выполнился.
+	}
+	defer pool.Close()
+	l.Info(ctx, "db pool init complete")
+
+	repo := repository.NewPostgresRepository(pool)
+	service := service.NewTorrentService(repo)
+	handler := transport.NewServer(service)
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptors.LoggingInterceptor(l), 
+			interceptors.RecoveryInterceptor(l),
+		))
+	pb.RegisterAuthServiceServer(grpcServer, handler)
+
+	httpServer := infraServerInit(pool, cfg, l)
+	g, errgr_ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Grpc.Port))
+		if err != nil {
+			l.Error(ctx, "grpc server starting", logger.Error(err))
+			return err
+		}
+		l.Info(ctx, "grpc server starting", logger.Int("port", cfg.Grpc.Port))
+		return grpcServer.Serve(lis)
+	})
+	g.Go(func() error {
+		l.Info(ctx, "http infra server starting")
+		return httpServer.ListenAndServe()
+	})
+	g.Go(func() error {
+		shutdown := make(chan os.Signal, 1)
+		signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+
+		select {
+        case <-shutdown:
+            l.Info(ctx, "signal received, starting graceful shutdown")
+        case <-errgr_ctx.Done():
+            l.Info(ctx, "errgroup context done, forcing shutdown")
+        }
+
+		timeout, cancel := context.WithTimeout(ctx, 15 * time.Second)
+		defer cancel()
+		GrpcStopped := make(chan struct{})
+		HttpStopped := make(chan struct{})
+
+		AllStopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			l.Info(ctx, "grpc server stopped gracefully")
+			close(GrpcStopped)
+		}()
+		go func() {
+			httpServer.Shutdown(context.Background())
+			l.Info(ctx, "http server stopped gracefully")
+			close(HttpStopped)
+		}()
+		go func ()  {
+			<-GrpcStopped
+			<-HttpStopped
+
+			close(AllStopped)
+		}()
+
+		select {
+		case <-AllStopped:
+			
+		case <-timeout.Done():
+			l.Error(ctx, "shut down by timeout")
+			grpcServer.Stop()
+			httpServer.Close()
+		}
+		return nil
+	})
+
+
+	
+	
+	if err := g.Wait(); err != nil {
+		if err == http.ErrServerClosed {
+			l.Info(ctx, "auth-service stopped gracefully")
+		} else {
+			l.Error(ctx, "auth-service stopped with error", logger.Error(err))
+		}
+	} else {
+		l.Info(ctx, "auth-service stopped gracefully")
+	}
+}
+
+
+func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("ERROR"))
+			l.Error(ctx, "error on connection to db", logger.Error(err))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}
+	})
+
+	mux.Handle("/metrics", promhttp.Handler())
+
+	return &http.Server{
+		Addr: fmt.Sprintf(":%d", cfg.Infra),
+		Handler: mux,
+	}
+}=== FILE: ./auth-service/cmd/migration/main.go ===
+package main
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/monstrong/gracker2/pkg/config"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.Postgres.User, 
+		cfg.Postgres.Password, 
+		cfg.Postgres.Host,
+		cfg.Postgres.Port,
+		cfg.Postgres.DBName,
+		cfg.Postgres.SSLMode,
+	)
+
+	m, err := migrate.New("file://migrations", dsn)
+	if err != nil {
+		l.Error("error creating migration", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if len(os.Args) < 2 {
+		l.Error("add command")
+		os.Exit(1)
+	}
+	comand := os.Args[1]
+	switch comand {
+	case "up":
+		err = m.Up()
+	case "down":
+		err = m.Down()
+	case "step":
+		if len(os.Args) > 2 && os.Args[2] != "" {
+			steps, parseErr := strconv.Atoi(os.Args[2])
+			if parseErr != nil {
+				l.Error("error converting steps to int", slog.String("error", parseErr.Error()))
+				os.Exit(1)
+			}
+			err = m.Steps(steps)
+		} else {
+			l.Error("add number of steps")
+			os.Exit(1)
+		}
+	default:
+		l.Error("wrong command")
+		os.Exit(1)
+	}
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			l.Info("database is already up")
+		} else {
+			l.Error("error doing migration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}
+}=== FILE: ./auth-service/config/.env.example ===
+POSTGRES_PASSWORD==== FILE: ./auth-service/config/config.yaml ===
+grpc:
+  name: auth-service
+  port: 50051
+  timeout: 5s
+infra:
+  name: infra
+  port: 8080
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_users
+  max_conns: 10
+  ssl_mode: disable
+logger:
+  level: local=== FILE: ./auth-service/migrations/000001_create_users.down.sql ===
+DROP TABLE IF EXISTS users;
+
+=== FILE: ./auth-service/migrations/000001_create_users.up.sql ===
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY uuid_generate_v4(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    status SMALLINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);=== FILE: ./auth-service/go.mod ===
+module github.com/monstrong/gracker2/auth-service
+
+go 1.26.2
+
+require (
+	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/monstrong/gracker2/pkg v0.0.0-00010101000000-000000000000
+	github.com/monstrong/gracker2/proto v0.0.0-00010101000000-000000000000
+	github.com/prometheus/client_golang v1.23.2
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/spf13/viper v1.21.0 // indirect
+	go.uber.org/zap v1.28.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
+)
+
+require (
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/lib/pq v1.10.9 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/sync v0.22.0
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+)
+
+replace github.com/monstrong/gracker2/pkg => ../pkg
+
+replace github.com/monstrong/gracker2/proto => ../proto
+=== FILE: ./auth-service/Makefile ===
+include config/.env
+export
+
+.PHONY: migrate-up migrate-down migrate-step migrate-step-down run
+
+migrate-up:
+	go run ./cmd/migrate up
+
+migrate-down:
+	go run ./cmd/migrate down
+
+migrate-step:
+	go run ./cmd/migrate step 1
+
+migrate-step-down:
+	go run ./cmd/migrate step -1
+
+run:
+	go run ./cmd/server
