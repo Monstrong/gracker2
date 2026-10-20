@@ -78,20 +78,16 @@ func (c *Config) validate() error {
 		return fmt.Errorf("invalid grpc name: empty")
 	case c.Grpc.Port <= 0:
 		return fmt.Errorf("invalid grpc port: %d, must be > 0", c.Grpc.Port)
-	case c.Grpc.Timeout <= 0:
-		return fmt.Errorf("invalid grpc timeout: %s, must be > 0", c.Grpc.Timeout)
-	case c.Grpc.Timeout > time.Minute:
-		return fmt.Errorf("invalid grpc timeout: %s, must be <= 1m", c.Grpc.Timeout)
+	case c.Grpc.Timeout <= 0 || c.Grpc.Timeout > time.Minute:
+		return fmt.Errorf("invalid grpc timeout: %s, must be > 0 and <= 1m", c.Grpc.Timeout)
 
 	// infra
 	case c.Infra.Name == "":
 		return fmt.Errorf("invalid infra name: empty")
 	case c.Infra.Port <= 0:
 		return fmt.Errorf("invalid infra port: %d, must be > 0", c.Infra.Port)
-	case c.Infra.Timeout <= 0:
-		return fmt.Errorf("invalid infra timeout: %s, must be > 0", c.Infra.Timeout)
-	case c.Infra.Timeout > time.Minute:
-		return fmt.Errorf("invalid infra timeout: %s, must be <= 1m", c.Grpc.Timeout)
+	case c.Infra.Timeout <= 0 || c.Infra.Timeout > time.Minute:
+		return fmt.Errorf("invalid infra timeout: %s, must be > 0 and <= 1m", c.Infra.Timeout)
 
 	// logger
 	case c.Logger.Level == "":
@@ -118,6 +114,9 @@ func (c *Config) validate() error {
 	case c.Postgres.Host == "":
 		return fmt.Errorf("empty postgres host")
 
+	// graceful shutdown
+	case c.GracefulShutdownTimeout <= 0 || c.GracefulShutdownTimeout > time.Minute:
+		return fmt.Errorf("invalid graceful shutdown timeout: %s, must be > 0 and <= 1m", c.GracefulShutdownTimeout)
 	default:
 		return nil
 	}
