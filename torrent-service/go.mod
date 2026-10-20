@@ -51,3 +51,5 @@ require (
 )
 
 replace github.com/monstrong/gracker2/pkg => ../pkg
+
+replace github.com/monstrong/gracker2/proto => ../proto

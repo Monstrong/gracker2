@@ -54,11 +54,11 @@ func (s *Server) ListTorrents(ctx context.Context, in *pb.ListTorrentsRequest) (
 func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest) (*pb.CreateTorrentResponse, error) {
 	authorID, err := uuid.Parse(in.GetAuthorId())
 	if err != nil {
-		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid authorID id format"}
+		return nil, &errModels.ValidationError{Field: "authorID", Reason: "invalid authorID id format"}
 	}
 	categoryID, err := uuid.Parse(in.GetCategoryId())
 	if err != nil {
-		return nil, &errModels.ValidationError{Field: "id", Reason: "invalid categoryID id format"}
+		return nil, &errModels.ValidationError{Field: "categoryID", Reason: "invalid categoryID id format"}
 	}
 	t := models.Torrent{Name: in.GetName(), 
 		Description: in.GetDescription(), 
