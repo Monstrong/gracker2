@@ -10,10 +10,10 @@ import (
 )
 
 type Config struct {
-	Grpc     `mapstructure:"grpc" yaml:"grpc"`
-	Infra    `mapstructure:"infra" yaml:"infra"`
-	Postgres `mapstructure:"postgres" yaml:"postgres"`
-	Logger   `mapstructure:"logger" yaml:"logger"`
+	Grpc     Grpc     `mapstructure:"grpc" yaml:"grpc"`
+	Infra    Infra    `mapstructure:"infra" yaml:"infra"`
+	Postgres Postgres `mapstructure:"postgres" yaml:"postgres"`
+	Logger   Logger   `mapstructure:"logger" yaml:"logger"`
 }
 
 type Grpc struct {
@@ -61,5 +61,76 @@ func Load() (*Config, error) {
 
 	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
 
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
 	return cfg, nil
+}
+
+
+// 
+func (c *Config) validate() error {
+	switch {
+	// grpc
+	case c.Grpc.Name == "":
+		return fmt.Errorf("invalid grpc name: empty")
+	case c.Grpc.Port <= 0:
+		return fmt.Errorf("invalid grpc port: %d, must be > 0", c.Grpc.Port)
+	case c.Grpc.Timeout <= 0:
+		return fmt.Errorf("invalid grpc timeout: %s, must be > 0", c.Grpc.Timeout)
+	case c.Grpc.Timeout > time.Minute:
+		return fmt.Errorf("invalid grpc timeout: %s, must be <= 1m", c.Grpc.Timeout)
+
+	// infra
+	case c.Infra.Name == "":
+		return fmt.Errorf("invalid infra name: empty")
+	case c.Infra.Port <= 0:
+		return fmt.Errorf("invalid infra port: %d, must be > 0", c.Infra.Port)
+	case c.Infra.Timeout <= 0:
+		return fmt.Errorf("invalid infra timeout: %s, must be > 0", c.Infra.Timeout)
+	case c.Infra.Timeout > time.Minute:
+		return fmt.Errorf("invalid infra timeout: %s, must be <= 1m", c.Grpc.Timeout)
+
+	// logger
+	case c.Logger.Level == "":
+		return fmt.Errorf("invalid logger level: empty")
+
+	// postgres
+	case c.Postgres.SSLMode == "":
+		return fmt.Errorf("invalid ssl mode: empty")
+	case !isValidSSLMode(c.Postgres.SSLMode):
+		return fmt.Errorf(
+			"invalid ssl mode: %q, allowed: disable, allow, prefer, require, verify-ca, verify-full",
+			c.Postgres.SSLMode,
+		)
+	case c.Postgres.MaxConns <= 0:
+		return fmt.Errorf("invalid max conns: %d, must be > 0", c.Postgres.MaxConns)
+	case c.Postgres.Port <= 0:
+		return fmt.Errorf("invalid postgres port: %d, must be > 0", c.Postgres.Port)
+	case c.Postgres.User == "":
+		return fmt.Errorf("empty postgres user")
+	case c.Postgres.Password == "":
+		return fmt.Errorf("empty postgres password")
+	case c.Postgres.DBName == "":
+		return fmt.Errorf("empty postgres dbname")
+	case c.Postgres.Host == "":
+		return fmt.Errorf("empty postgres host")
+
+	default:
+		return nil
+	}
+}
+
+var validSSLModes = map[string]struct{}{
+	"disable":     {},
+	"allow":       {},
+	"prefer":      {},
+	"require":     {},
+	"verify-ca":   {},
+	"verify-full": {},
+}
+
+func isValidSSLMode(m string) bool {
+	_, ok := validSSLModes[m]
+	return ok
 }
