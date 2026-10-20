@@ -14,6 +14,8 @@ type Config struct {
 	Infra    Infra    `mapstructure:"infra" yaml:"infra"`
 	Postgres Postgres `mapstructure:"postgres" yaml:"postgres"`
 	Logger   Logger   `mapstructure:"logger" yaml:"logger"`
+
+	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout" yaml:"graceful_shutdown_timeout"`
 }
 
 type Grpc struct {

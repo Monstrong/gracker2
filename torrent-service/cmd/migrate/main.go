@@ -42,8 +42,8 @@ func main() {
 		l.Error("add command")
 		os.Exit(1)
 	}
-	comand := os.Args[1]
-	switch comand {
+	command := os.Args[1]
+	switch command {
 	case "up":
 		err = m.Up()
 	case "down":

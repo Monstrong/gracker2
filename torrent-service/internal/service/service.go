@@ -27,9 +27,9 @@ func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*
 	case torrent.InfoHash == "":
 		return nil, &errs.ValidationError{Field: "info_hash", Reason: "'info_hash' is required"}
 	case torrent.AuthorID == uuid.Nil:
-		return nil, &errs.ValidationError{Field: "author_id", Reason: "'author_id' is required"}
+		return nil, &errs.ValidationError{Field: "authorID", Reason: "'authorID' is required"}
 	case torrent.CategoryID == uuid.Nil:
-		return nil, &errs.ValidationError{Field: "category_id", Reason: "'category_id' is required"}
+		return nil, &errs.ValidationError{Field: "categoryID", Reason: "'categoryID' is required"}
 	}
 
 	m, err := s.r.Create(ctx, torrent)

@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func InfraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
+func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -29,6 +29,7 @@ func InfraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *h
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte("ERROR"))
 			l.Error(ctx, "error on connection to db", logger.Error(err))
+			
 		} else {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))

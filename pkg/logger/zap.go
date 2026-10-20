@@ -21,7 +21,7 @@ type Logger interface {
 	Debug(ctx context.Context, msg string, fields ...Field)
 	Error(ctx context.Context, msg string, fields ...Field)
 	Warn(ctx context.Context, msg string, fields ...Field)
-
+	Sync()
 }
 
 type L struct {
