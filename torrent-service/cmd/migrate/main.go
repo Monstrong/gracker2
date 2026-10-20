@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -14,8 +15,6 @@ import (
 	"github.com/monstrong/gracker2/pkg/config"
 )
 
-
-
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -23,14 +22,7 @@ func main() {
 	}
 	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.Postgres.User, 
-		cfg.Postgres.Password, 
-		cfg.Postgres.Host,
-		cfg.Postgres.Port,
-		cfg.Postgres.DBName,
-		cfg.Postgres.SSLMode,
-	)
+	dsn := buildDSN(&cfg.Postgres)
 
 	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {
@@ -72,4 +64,17 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func buildDSN(cfg *config.Postgres) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
