@@ -48,7 +48,7 @@ func New(ctx context.Context) (*App, error) {
 	l.Info(ctx, "db pool init complete")
 
 	repo := repository.NewPostgresRepository(pool)
-	svc := service.NewTorrentService(repo)
+	svc := service.NewAuthService(repo)
 	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(
@@ -57,7 +57,7 @@ func New(ctx context.Context) (*App, error) {
 			interceptors.LoggingInterceptor(l),
 			interceptors.TimeoutInterceptor(&cfg.Grpc),
 		))
-	pb.RegisterTorrentServiceServer(grpcServer, handler)
+	pb.RegisterAuthServiceServer(grpcServer, handler)
 
 	httpServer := infraServerInit(pool, cfg, l)
 

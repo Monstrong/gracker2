@@ -69,7 +69,6 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// 
 func (c *Config) validate() error {
 	switch {
 	// grpc

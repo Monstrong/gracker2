@@ -22,18 +22,9 @@ import (
 const defaultTimeout = 5*time.Second
 
 func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
-	u := &url.URL{
-		Scheme:   "postgres",
-		Host:     net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
-		User:     url.UserPassword(cfg.User, cfg.Password),
-		Path:     cfg.DBName,
-	}
-	q := u.Query()
-	q.Set("sslmode", cfg.SSLMode)
-	q.Set("pool_max_conns", strconv.Itoa(cfg.MaxConns))
-	u.RawQuery = q.Encode()
+	dsn := BuildDSN(cfg)
 
-	poolCfg, err := pgxpool.ParseConfig(u.String())
+	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
@@ -53,7 +44,19 @@ func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
 
 	return pool, nil
 }
-=== FILE: ./pkg/config/config.go ===
+
+func BuildDSN(cfg *config.Postgres) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
+}=== FILE: ./pkg/config/config.go ===
 package config
 
 import (
@@ -125,8 +128,6 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-
-// 
 func (c *Config) validate() error {
 	switch {
 	// grpc
@@ -190,7 +191,8 @@ var validSSLModes = map[string]struct{}{
 func isValidSSLMode(m string) bool {
 	_, ok := validSSLModes[m]
 	return ok
-}=== FILE: ./pkg/go.mod ===
+}
+=== FILE: ./pkg/go.mod ===
 module github.com/monstrong/gracker2/pkg
 
 go 1.26.2
@@ -235,9 +237,11 @@ var (
 	ErrNotFound      = errors.New("record not found")
 	ErrInternal      = errors.New("internal server error")
 	ErrAlreadyExists = errors.New("record already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials") // for auth
 )
 
-// new ErrInvalidData
+
+// insted of ErrInvalidData
 type ValidationError struct {
 	Field  string
 	Reason string
@@ -246,6 +250,7 @@ type ValidationError struct {
 func (e *ValidationError) Error() string {
 	return e.Reason
 }
+
 === FILE: ./pkg/interceptors/logger.go ===
 package interceptors
 
@@ -550,23 +555,132 @@ option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
 service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+
+  rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
+  rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse);
+
+    
+  rpc GetMe(GetMeRequest) returns (GetMeResponse); // Свой профиль 
+  rpc GetUser(GetUserRequest) returns (GetUserResponse); // без email
+
+  rpc AdminGetUser(AdminGetUserRequest) returns (AdminGetUserResponse); // админу понадобился email
+
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
 }
 
 message LoginRequest {
-  
+  string email = 1;
+  string password = 2;
 }
 
 message LoginResponse {
-  
+  string access_token = 1;
+  string refresh_token = 2;
 }
 
 message RegisterRequest {
-  
+  string name = 1;
+  string email = 2;
+  string password = 3;
 }
 
-message RegisterResponse {
-  
-}=== FILE: ./proto/go.mod ===
+message RegisterResponse { string id = 1; }
+
+message RefreshRequest { string refresh_token = 1; }
+
+message RefreshResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message ValidateRequest { string access_token = 1; }
+
+message ValidateResponse {
+  string id = 1;
+  Role role = 2;
+  Premium premium = 3;
+}
+
+message RoleUpdateRequest {
+  string target_user_id = 1;
+  Role new_role = 2;
+}
+
+message PremiumUpdateResponse {  bool updated = 1; }
+
+message PremiumUpdateRequest {
+  string target_user_id = 1;
+  Premium new_premium = 2;
+}
+
+message RoleUpdateResponse { bool updated = 1; }
+
+message GetMeRequest {}
+message GetMeResponse { User user = 1; }
+
+message GetUserRequest { string id = 1; }
+message GetUserResponse { PublicUser user = 1; }
+
+message DeleteUserRequest {  string id = 1; } // id == callerID || callerRole == admin
+message DeleteUserResponse { bool deleted = 1; }
+
+message AdminGetUserRequest { string id = 1; }
+message AdminGetUserResponse { User user = 1; }
+message UpdateUserRequest {
+  optional string name  = 1;
+  optional string email = 2;
+  optional string avatar_url = 3;
+  optional string bio = 4;
+}
+
+message UpdateUserResponse { User user = 1; }
+
+message ChangePasswordRequest {
+  string old_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse { bool updated = 1; }
+
+message PublicUser {
+  string  id         = 1;
+  string  name       = 2;
+  reserved 3;       // был email
+  Role    role       = 4;
+  reserved 5;        // был premium
+  string  avatar_url = 6;
+  string  bio        = 7;
+}
+
+message User {
+  string  id         = 1;
+  string  name       = 2;
+  string  email      = 3;
+  Role    role       = 4;
+  Premium premium    = 5;
+  string  avatar_url = 6;
+  string  bio        = 7;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_USER = 1;
+  ROLE_BANNED = 2;
+  ROLE_MODERATOR = 3;
+  ROLE_ADMIN = 4;
+}
+
+enum Premium {
+  PREMIUM_UNSPECIFIED = 0;
+  PREMIUM_FREE = 1;
+  PREMIUM_PREMIUM = 2;
+}
+=== FILE: ./proto/go.mod ===
 module github.com/monstrong/gracker2/proto
 
 go 1.26.2
@@ -683,8 +797,6 @@ import (
 	"errors"
 	"log"
 	"log/slog"
-	"net"
-	"net/url"
 	"os"
 	"strconv"
 
@@ -692,6 +804,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
 )
 
 func main() {
@@ -701,7 +814,7 @@ func main() {
 	}
 	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	dsn := buildDSN(&cfg.Postgres)
+	dsn := db.BuildDSN(&cfg.Postgres)
 
 	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {
@@ -745,25 +858,15 @@ func main() {
 	}
 }
 
-func buildDSN(cfg *config.Postgres) string {
-	u := &url.URL{
-		Scheme: "postgres",
-		User:   url.UserPassword(cfg.User, cfg.Password),
-		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
-		Path:   cfg.DBName,
-	}
-	q := u.Query()
-	q.Set("sslmode", cfg.SSLMode)
-	u.RawQuery = q.Encode()
-	return u.String()
-}
 === FILE: ./torrent-service/TODO.md ===
 1. реализовать Update с частичным обновлением
 2. реализовать List с любыми фильтрами и редактируемым ORDER BY
 3. Умный поиск
 
 4. тесты для toGRPCError (table-driven)
-
+5. задействовать infra timeout
+6. Трейсинг: OpenTelemetry вместо x-trace-id
+7. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)+++
 === FILE: ./torrent-service/config/.env.example ===
 POSTGRES_PASSWORD==== FILE: ./torrent-service/config/config.yaml ===
 grpc:
@@ -1552,7 +1655,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -1562,6 +1664,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
 )
 
 func main() {
@@ -1571,14 +1674,7 @@ func main() {
 	}
 	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.Postgres.User, 
-		cfg.Postgres.Password, 
-		cfg.Postgres.Host,
-		cfg.Postgres.Port,
-		cfg.Postgres.DBName,
-		cfg.Postgres.SSLMode,
-	)
+	dsn := db.BuildDSN(&cfg.Postgres)
 
 	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {
@@ -1590,8 +1686,8 @@ func main() {
 		l.Error("add command")
 		os.Exit(1)
 	}
-	comand := os.Args[1]
-	switch comand {
+	command := os.Args[1]
+	switch command {
 	case "up":
 		err = m.Up()
 	case "down":
@@ -1620,7 +1716,18 @@ func main() {
 			os.Exit(1)
 		}
 	}
-}=== FILE: ./auth-service/config/.env.example ===
+}
+
+=== FILE: ./auth-service/pkg/hasher/hasher.go ===
+package hasher
+=== FILE: ./auth-service/pkg/jwt/jwt.go ===
+package jwt
+=== FILE: ./auth-service/TODO.md ===
+1. задействовать infra timeout
+2. Трейсинг: OpenTelemetry вместо x-trace-id
+3. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)
+
+=== FILE: ./auth-service/config/.env.example ===
 POSTGRES_PASSWORD==== FILE: ./auth-service/config/config.yaml ===
 grpc:
   name: auth-service
@@ -1629,6 +1736,7 @@ grpc:
 infra:
   name: infra
   port: 8080
+  timeout: 5s
 postgres:
   host: localhost
   port: 5432
@@ -1637,20 +1745,42 @@ postgres:
   max_conns: 10
   ssl_mode: disable
 logger:
-  level: local=== FILE: ./auth-service/migrations/000001_create_users.down.sql ===
+  level: local
+GracefulShutdownTimeout: 15s=== FILE: ./auth-service/migrations/000002_premium.up.sql ===
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS premium SMALLINT NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS bio        VARCHAR(500) NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);=== FILE: ./auth-service/migrations/000001_create_users.down.sql ===
 DROP TABLE IF EXISTS users;
 
 === FILE: ./auth-service/migrations/000001_create_users.up.sql ===
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    status SMALLINT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);=== FILE: ./auth-service/go.mod ===
+    role SMALLINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- migrate create -ext sql -dir migrations -seq add_something_to_users=== FILE: ./auth-service/migrations/000002_premium.down.sql ===
+DROP TABLE IF EXISTS refresh_tokens;
+
+ALTER TABLE users 
+    DROP COLUMN IF EXISTS premium;
+    DROP COLUMN IF EXISTS avatar_url,
+    DROP COLUMN IF EXISTS bio;=== FILE: ./auth-service/go.mod ===
 module github.com/monstrong/gracker2/auth-service
 
 go 1.26.2
@@ -1705,7 +1835,7 @@ import (
 	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
-	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
 	"github.com/monstrong/gracker2/auth-service/internal/repository"
 	"github.com/monstrong/gracker2/auth-service/internal/service"
 	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
@@ -1741,7 +1871,7 @@ func New(ctx context.Context) (*App, error) {
 	l.Info(ctx, "db pool init complete")
 
 	repo := repository.NewPostgresRepository(pool)
-	svc := service.NewTorrentService(repo)
+	svc := service.NewAuthService(repo)
 	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(
@@ -1750,7 +1880,7 @@ func New(ctx context.Context) (*App, error) {
 			interceptors.LoggingInterceptor(l),
 			interceptors.TimeoutInterceptor(&cfg.Grpc),
 		))
-	pb.RegisterTorrentServiceServer(grpcServer, handler)
+	pb.RegisterAuthServiceServer(grpcServer, handler)
 
 	httpServer := infraServerInit(pool, cfg, l)
 
@@ -1801,10 +1931,10 @@ func (a *App) Run(ctx context.Context) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		a.l.Error(logCtx, "torrent-service stopped with error", logger.Error(err))
+		a.l.Error(logCtx, "auth-service stopped with error", logger.Error(err))
 		return err
 	}
-	a.l.Info(logCtx, "torrent-service stopped gracefully")
+	a.l.Info(logCtx, "auth-service stopped gracefully")
 	return nil
 }
 
@@ -1904,6 +2034,53 @@ func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *h
 		Handler: mux,
 	}
 }
+=== FILE: ./auth-service/internal/service/auth.go ===
+package service
+=== FILE: ./auth-service/internal/repository/repo.go ===
+package repository
+=== FILE: ./auth-service/internal/transport/grpc/grpc.go ===
+package grpc
+=== FILE: ./auth-service/internal/models/models.go ===
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type User struct {
+	ID           uuid.UUID   `db:"id"`
+	Name         string      `db:"name"`
+	Email        string      `db:"email"`
+	PasswordHash string      `db:"password_hash"`
+	Role         Role        `db:"role"`
+	Premium      PremiumType `db:"premium"`
+
+	AvatarURL string `db:"avatar_url"` // "" = нет аватарки
+	Bio       string `db:"bio"`        // "" = нет описания
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type Role int8
+
+const (
+	RoleUnspecified Role = iota
+	UserRole
+	BannedRole
+	ModeratorRole
+	AdminRole
+)
+
+type PremiumType int8
+
+const (
+	PremiumUnspecified PremiumType = iota
+	Free
+	Premium
+)
 === FILE: ./auth-service/Makefile ===
 include config/.env
 export

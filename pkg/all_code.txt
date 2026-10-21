@@ -1,0 +1,527 @@
+=== FILE: ./db/postgres.go ===
+package db
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/url"
+	"strconv"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/config"
+)
+
+const defaultTimeout = 5*time.Second
+
+func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
+	dsn := BuildDSN(cfg)
+
+	poolCfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating pool: %w", err)
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	return pool, nil
+}
+
+func BuildDSN(cfg *config.Postgres) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
+}=== FILE: ./config/config.go ===
+package config
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+)
+
+type Config struct {
+	Grpc     Grpc     `mapstructure:"grpc" yaml:"grpc"`
+	Infra    Infra    `mapstructure:"infra" yaml:"infra"`
+	Postgres Postgres `mapstructure:"postgres" yaml:"postgres"`
+	Logger   Logger   `mapstructure:"logger" yaml:"logger"`
+
+	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout" yaml:"graceful_shutdown_timeout"`
+}
+
+type Grpc struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+type Infra struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Postgres struct {
+	Host     string `mapstructure:"host" yaml:"host"`
+	Port     int    `mapstructure:"port" yaml:"port"`
+	User     string `mapstructure:"user" yaml:"user"`
+	Password string
+	DBName   string `mapstructure:"dbname" yaml:"dbname"`
+	MaxConns int    `mapstructure:"max_conns" yaml:"max_conns"`
+	SSLMode  string `mapstructure:"ssl_mode"`
+}
+type Logger struct {
+	Level string `mapstructure:"level" yaml:"level"`
+}
+
+const configYamlPath = "config/config.yaml"
+const configEnvPath = "config/.env"
+const postgresPasswordName = "POSTGRES_PASSWORD"
+
+func Load() (*Config, error) {
+	cfg := &Config{}
+	v := viper.New()
+	v.SetConfigFile(configYamlPath)
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("error reading config.yaml:%w", err)
+	}
+
+	_ = godotenv.Load(configEnvPath)
+	v.AutomaticEnv()
+
+	if err := v.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
+
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (c *Config) validate() error {
+	switch {
+	// grpc
+	case c.Grpc.Name == "":
+		return fmt.Errorf("invalid grpc name: empty")
+	case c.Grpc.Port <= 0:
+		return fmt.Errorf("invalid grpc port: %d, must be > 0", c.Grpc.Port)
+	case c.Grpc.Timeout <= 0 || c.Grpc.Timeout > time.Minute:
+		return fmt.Errorf("invalid grpc timeout: %s, must be > 0 and <= 1m", c.Grpc.Timeout)
+
+	// infra
+	case c.Infra.Name == "":
+		return fmt.Errorf("invalid infra name: empty")
+	case c.Infra.Port <= 0:
+		return fmt.Errorf("invalid infra port: %d, must be > 0", c.Infra.Port)
+	case c.Infra.Timeout <= 0 || c.Infra.Timeout > time.Minute:
+		return fmt.Errorf("invalid infra timeout: %s, must be > 0 and <= 1m", c.Infra.Timeout)
+
+	// logger
+	case c.Logger.Level == "":
+		return fmt.Errorf("invalid logger level: empty")
+
+	// postgres
+	case c.Postgres.SSLMode == "":
+		return fmt.Errorf("invalid ssl mode: empty")
+	case !isValidSSLMode(c.Postgres.SSLMode):
+		return fmt.Errorf(
+			"invalid ssl mode: %q, allowed: disable, allow, prefer, require, verify-ca, verify-full",
+			c.Postgres.SSLMode,
+		)
+	case c.Postgres.MaxConns <= 0:
+		return fmt.Errorf("invalid max conns: %d, must be > 0", c.Postgres.MaxConns)
+	case c.Postgres.Port <= 0:
+		return fmt.Errorf("invalid postgres port: %d, must be > 0", c.Postgres.Port)
+	case c.Postgres.User == "":
+		return fmt.Errorf("empty postgres user")
+	case c.Postgres.Password == "":
+		return fmt.Errorf("empty postgres password")
+	case c.Postgres.DBName == "":
+		return fmt.Errorf("empty postgres dbname")
+	case c.Postgres.Host == "":
+		return fmt.Errorf("empty postgres host")
+
+	// graceful shutdown
+	case c.GracefulShutdownTimeout <= 0 || c.GracefulShutdownTimeout > time.Minute:
+		return fmt.Errorf("invalid graceful shutdown timeout: %s, must be > 0 and <= 1m", c.GracefulShutdownTimeout)
+	default:
+		return nil
+	}
+}
+
+var validSSLModes = map[string]struct{}{
+	"disable":     {},
+	"allow":       {},
+	"prefer":      {},
+	"require":     {},
+	"verify-ca":   {},
+	"verify-full": {},
+}
+
+func isValidSSLMode(m string) bool {
+	_, ok := validSSLModes[m]
+	return ok
+}
+=== FILE: ./go.mod ===
+module github.com/monstrong/gracker2/pkg
+
+go 1.26.2
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/joho/godotenv v1.5.1
+	github.com/spf13/viper v1.21.0
+	go.uber.org/zap v1.28.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
+)
+=== FILE: ./errs/errors.go ===
+package errs
+
+import "errors"
+
+var (
+	ErrNotFound      = errors.New("record not found")
+	ErrInternal      = errors.New("internal server error")
+	ErrAlreadyExists = errors.New("record already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials") // for auth
+)
+
+
+// insted of ErrInvalidData
+type ValidationError struct {
+	Field  string
+	Reason string
+}
+
+func (e *ValidationError) Error() string {
+	return e.Reason
+}
+
+=== FILE: ./all_code.txt ===
+=== FILE: ./interceptors/logger.go ===
+package interceptors
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/errs"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+)
+
+const DurationKey = "request-duration"
+
+func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		start := time.Now()
+		reqID := uuid.New().String()
+
+		MD, _ := metadata.FromIncomingContext(ctx)
+		var traceID string
+		vals := MD.Get(string(logger.LoggerTraceIDKey))
+		if len(vals) > 0 {
+			if _, err := uuid.Parse(vals[0]); err != nil {
+				l.Error(ctx, info.FullMethod, logger.Error(err))
+				traceID = uuid.New().String()
+			} else {
+				traceID = vals[0]
+			}
+		} else {
+			traceID = uuid.New().String()
+		}
+
+		ctx = logger.WithRequestID(ctx, reqID)
+		ctx = logger.WithTraceID(ctx, traceID)
+		res, err := handler(ctx, req)
+		duration := time.Since(start)
+
+		if err != nil {
+			var ve *errs.ValidationError
+			switch {
+			case errors.As(err, &ve):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			case errors.Is(err, errs.ErrNotFound),
+				errors.Is(err, errs.ErrAlreadyExists):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			case errors.Is(err, context.DeadlineExceeded),
+				errors.Is(err, context.Canceled):
+				l.Warn(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			default:
+				l.Error(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			}
+		} else {
+			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration))
+		}
+
+		err = toGRPCError(err) // значение меняется на статус код, для return
+
+		return res, err
+	}
+}
+
+func toGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var ve *errs.ValidationError
+	if errors.As(err, &ve) {
+		return status.Error(codes.InvalidArgument, ve.Reason)
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	}
+	if errors.Is(err, context.Canceled) {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	if errors.Is(err, errs.ErrNotFound) {
+		return status.Error(codes.NotFound, errs.ErrNotFound.Error())
+	}
+	if errors.Is(err, errs.ErrAlreadyExists) {
+		return status.Error(codes.AlreadyExists, errs.ErrAlreadyExists.Error())
+	}
+	return status.Error(codes.Internal, errs.ErrInternal.Error())
+}
+=== FILE: ./interceptors/recovery.go ===
+package interceptors
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/monstrong/gracker2/pkg/logger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+
+func RecoveryInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context, 
+		req any, 
+		info *grpc.UnaryServerInfo, 
+		handler grpc.UnaryHandler,
+		) (resp any, err error) {
+
+		defer func() {
+			if p := recover(); p != nil{
+				l.Error(ctx, "panic recovered",
+					logger.String("method", info.FullMethod),
+					logger.String("panic", fmt.Sprintf("%v", p)),
+				)
+
+				// подмена ошибки чтобы пользователь не увидел её текст
+				// это - то, для чего здесь возвращаемые параметры проименнованы
+				err = status.Error(codes.Internal, "internal server error") 
+			}
+		}()
+		return handler(ctx, req)
+	}
+}=== FILE: ./interceptors/timeoutAdder.go ===
+package interceptors
+
+import (
+	"context"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"google.golang.org/grpc"
+)
+
+func TimeoutInterceptor(cfg *config.Grpc) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context, 
+		req any, 
+		info *grpc.UnaryServerInfo, 
+		handler grpc.UnaryHandler,
+		) (resp any, err error) {
+
+		if _, ok := ctx.Deadline(); ok {
+			return handler(ctx, req)
+		}
+
+		ctxNew, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+		
+		return handler(ctxNew, req)
+			
+	}
+}=== FILE: ./logger/zap.go ===
+package logger
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"go.uber.org/zap"
+)
+
+type contextKey string
+
+const (
+	LoggerRequestIDKey contextKey = "x-request-id"
+	LoggerTraceIDKey   contextKey = "x-trace-id"
+)
+
+type Logger interface {
+	Info(ctx context.Context, msg string, fields ...Field)
+	Debug(ctx context.Context, msg string, fields ...Field)
+	Error(ctx context.Context, msg string, fields ...Field)
+	Warn(ctx context.Context, msg string, fields ...Field)
+	Sync()
+}
+
+type L struct {
+	z *zap.Logger
+}
+
+type Field = zap.Field
+
+
+func New(cfg *config.Logger) (*L, error) {
+
+	var logger *zap.Logger
+	var err error
+	var invalidLevel bool = false
+
+	switch cfg.Level {
+	case "dev", "development", "local":
+		logger, err = zap.NewDevelopment()
+	case "prod", "production":
+		logger, err = zap.NewProduction()
+	default:
+		logger, err = zap.NewProduction()
+		invalidLevel = true
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("creating logger:%w", err)
+	}
+
+	if invalidLevel {
+		logger.Warn("invalid logger level in config, fallback to production")
+		return &L{z: logger}, nil
+	}
+
+	return &L{z: logger}, nil
+}
+
+
+func WithRequestID (ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, LoggerRequestIDKey, id)
+}
+func WithTraceID (ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, LoggerTraceIDKey, id)
+}
+
+func (l *L) extractContextID (ctx context.Context) *zap.Logger{
+	logger := l.z
+	if reqID, ok := ctx.Value(LoggerRequestIDKey).(string); ok {
+		logger = logger.With(zap.String("x-request-id", reqID))
+	}
+
+	if traceID, ok := ctx.Value(LoggerTraceIDKey).(string); ok {
+		logger = logger.With(zap.String("x-trace-id", traceID))
+	}
+
+
+	return logger
+}
+
+func (l *L) Info(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Info(msg, fields...)
+}
+
+func (l *L) Warn(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Warn(msg, fields...)
+}
+
+func (l *L) Debug(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Debug(msg, fields...)
+}
+
+func (l *L) Error(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Error(msg, fields...)
+}
+
+func (l *L) Sync() {
+	_ = l.z.Sync()
+}
+
+func String(key string, val string) Field {
+	return zap.String(key, val)
+}
+
+func Int(key string, val int) Field {
+	return zap.Int(key, val)
+}
+
+func Duration(key string, val time.Duration) Field {
+	return zap.Duration(key, val)
+}
+
+func Error(err error) Field {
+	return zap.Error(err)
+}
