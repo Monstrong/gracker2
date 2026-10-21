@@ -4,8 +4,6 @@ import (
 	"errors"
 	"log"
 	"log/slog"
-	"net"
-	"net/url"
 	"os"
 	"strconv"
 
@@ -13,6 +11,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
 )
 
 func main() {
@@ -22,7 +21,7 @@ func main() {
 	}
 	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	dsn := buildDSN(&cfg.Postgres)
+	dsn := db.BuildDSN(&cfg.Postgres)
 
 	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {
@@ -66,15 +65,3 @@ func main() {
 	}
 }
 
-func buildDSN(cfg *config.Postgres) string {
-	u := &url.URL{
-		Scheme: "postgres",
-		User:   url.UserPassword(cfg.User, cfg.Password),
-		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
-		Path:   cfg.DBName,
-	}
-	q := u.Query()
-	q.Set("sslmode", cfg.SSLMode)
-	u.RawQuery = q.Encode()
-	return u.String()
-}

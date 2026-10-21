@@ -12,7 +12,7 @@ import (
 	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
-	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
 	"github.com/monstrong/gracker2/auth-service/internal/repository"
 	"github.com/monstrong/gracker2/auth-service/internal/service"
 	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
@@ -108,10 +108,10 @@ func (a *App) Run(ctx context.Context) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		a.l.Error(logCtx, "torrent-service stopped with error", logger.Error(err))
+		a.l.Error(logCtx, "auth-service stopped with error", logger.Error(err))
 		return err
 	}
-	a.l.Info(logCtx, "torrent-service stopped gracefully")
+	a.l.Info(logCtx, "auth-service stopped gracefully")
 	return nil
 }
 

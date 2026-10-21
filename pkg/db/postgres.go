@@ -15,18 +15,9 @@ import (
 const defaultTimeout = 5*time.Second
 
 func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
-	u := &url.URL{
-		Scheme:   "postgres",
-		Host:     net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
-		User:     url.UserPassword(cfg.User, cfg.Password),
-		Path:     cfg.DBName,
-	}
-	q := u.Query()
-	q.Set("sslmode", cfg.SSLMode)
-	q.Set("pool_max_conns", strconv.Itoa(cfg.MaxConns))
-	u.RawQuery = q.Encode()
+	dsn := BuildDSN(cfg)
 
-	poolCfg, err := pgxpool.ParseConfig(u.String())
+	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
@@ -45,4 +36,17 @@ func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+func BuildDSN(cfg *config.Postgres) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
