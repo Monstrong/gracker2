@@ -71,6 +71,7 @@ func LoadInto(target any) error {
 }
 
 // old func, better use LoadInto with your custom config struct
+// migrations or small services use this
 func Load() (*Config, error) { 
 	cfg := &Config{}
 

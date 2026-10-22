@@ -1,0 +1,632 @@
+=== FILE: ./cmd/server/main.go ===
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/monstrong/gracker2/auth-service/internal/app"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	a, err := app.New(ctx)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+
+	return a.Run(ctx)
+}=== FILE: ./cmd/migration/main.go ===
+package main
+
+import (
+	"errors"
+	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	dsn := db.BuildDSN(&cfg.Postgres)
+
+	m, err := migrate.New("file://migrations", dsn)
+	if err != nil {
+		l.Error("error creating migration", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if len(os.Args) < 2 {
+		l.Error("add command")
+		os.Exit(1)
+	}
+	command := os.Args[1]
+	switch command {
+	case "up":
+		err = m.Up()
+	case "down":
+		err = m.Down()
+	case "step":
+		if len(os.Args) > 2 && os.Args[2] != "" {
+			steps, parseErr := strconv.Atoi(os.Args[2])
+			if parseErr != nil {
+				l.Error("error converting steps to int", slog.String("error", parseErr.Error()))
+				os.Exit(1)
+			}
+			err = m.Steps(steps)
+		} else {
+			l.Error("add number of steps")
+			os.Exit(1)
+		}
+	default:
+		l.Error("wrong command")
+		os.Exit(1)
+	}
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			l.Info("database is already up")
+		} else {
+			l.Error("error doing migration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}
+}
+
+=== FILE: ./pkg/jwtmanager/jwt.go ===
+package jwtmanager
+
+import (
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+)
+
+type TokenManager interface {
+	NewToken(userID string, role models.Role, premium models.PremiumType) (string, error)
+	NewRefreshToken(userID string) (string, error)
+}
+
+type Manager struct {
+	signingKey      string
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+}
+
+func NewManager(signingKey string, accessTokenTTL time.Duration, refreshTokenTTL time.Duration) *Manager {
+	return &Manager{
+		signingKey:      signingKey,
+		accessTokenTTL:  accessTokenTTL,
+		refreshTokenTTL: refreshTokenTTL,
+	}
+}
+
+func (m *Manager) NewToken(userID string, role models.Role, premium models.PremiumType) (string, error) {
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"role":    role,
+		"premium": premium,
+
+		"exp":     time.Now().Add(m.accessTokenTTL).Unix(),
+	})
+
+	token, err := t.SignedString([]byte(m.signingKey))
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (m *Manager) NewRefreshToken(userID string) (string, error) {
+	
+}=== FILE: ./pkg/hasher/hasher.go ===
+package hasher
+
+import (
+	"golang.org/x/crypto/bcrypt"
+)
+
+func HashPassword(password string, cost int) (string, error) { 
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), cost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+func CheckPassword(password, hash string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err
+}
+
+=== FILE: ./TODO.md ===
+1. задействовать infra timeout
+2. Трейсинг: OpenTelemetry вместо x-trace-id
+3. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)
+
+4. Механизм актуализации ролей: если роль или премиум изменились в БД, уже выданный JWT продолжит содержать старые значения до истечения срока действия, если не добавить механизм актуализации.=== FILE: ./config/.env.example ===
+POSTGRES_PASSWORD=
+HMAC_SECRET==== FILE: ./config/config.yaml ===
+grpc:
+  name: auth-service
+  port: 50051
+  timeout: 5s
+infra:
+  name: infra
+  port: 8080
+  timeout: 5s
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_users
+  max_conns: 10
+  ssl_mode: disable
+logger:
+  level: local
+GracefulShutdownTimeout: 15s
+hasher:
+  cost: 10
+jwt:
+  access_token_ttl: 15m
+  refresh_token_ttl: 24h=== FILE: ./migrations/000002_premium.up.sql ===
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS premium SMALLINT NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS bio        VARCHAR(500) NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);=== FILE: ./migrations/000001_create_users.down.sql ===
+DROP TABLE IF EXISTS users;
+
+=== FILE: ./migrations/000001_create_users.up.sql ===
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role SMALLINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- migrate create -ext sql -dir migrations -seq add_something_to_users=== FILE: ./migrations/000002_premium.down.sql ===
+DROP TABLE IF EXISTS refresh_tokens;
+
+ALTER TABLE users 
+    DROP COLUMN IF EXISTS premium;
+    DROP COLUMN IF EXISTS avatar_url,
+    DROP COLUMN IF EXISTS bio;=== FILE: ./go.mod ===
+module github.com/monstrong/gracker2/auth-service
+
+go 1.26.2
+
+require (
+	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/monstrong/gracker2/pkg v0.0.0-00010101000000-000000000000
+	github.com/monstrong/gracker2/proto v0.0.0-00010101000000-000000000000
+	github.com/prometheus/client_golang v1.25.0
+	golang.org/x/sync v0.24.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/spf13/viper v1.21.0 // indirect
+)
+
+require (
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/lib/pq v1.10.9 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/prometheus/client_model v0.6.3 // indirect
+	github.com/prometheus/common v0.72.0 // indirect
+	github.com/prometheus/procfs v0.22.0 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/zap v1.28.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
+)
+
+replace github.com/monstrong/gracker2/pkg => ../pkg
+
+replace github.com/monstrong/gracker2/proto => ../proto
+=== FILE: ./all_code.txt ===
+=== FILE: ./internal/app/app.go ===
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/auth-service/internal/authconfig"
+	"github.com/monstrong/gracker2/auth-service/internal/repository"
+	"github.com/monstrong/gracker2/auth-service/internal/service"
+	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/pkg/logger"
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+)
+
+type App struct {
+	cfg        *authconfig.Config
+	l          logger.Logger
+	pool       *pgxpool.Pool
+	grpcServer *grpc.Server
+	httpServer *http.Server
+}
+
+func New(ctx context.Context) (*App, error) {
+	cfg, err := authconfig.Load()
+	if err != nil {
+		return nil, fmt.Errorf("init config: %w", err)
+	}
+
+	l, err := logger.New(&cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("init logger: %w", err)
+	}
+	l.Info(ctx, "config & logger init complete")
+
+	// создаёт пул и делает Ping
+	pool, err := db.NewPool(&cfg.Postgres)
+	if err != nil {
+		return nil, fmt.Errorf("create db pool: %w", err)
+	}
+	l.Info(ctx, "db pool init complete")
+
+	repo := repository.NewPostgresRepository(pool)
+	svc := service.NewAuthService(repo)
+	handler := transport.NewServer(svc)
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptors.RecoveryInterceptor(l),
+			interceptors.LoggingInterceptor(l),
+			interceptors.TimeoutInterceptor(&cfg.Grpc),
+		))
+	pb.RegisterAuthServiceServer(grpcServer, handler)
+
+	httpServer := infraServerInit(pool, cfg, l)
+
+	return &App{
+		cfg:        cfg,
+		l:          l,
+		pool:       pool,
+		grpcServer: grpcServer,
+		httpServer: httpServer,
+	}, nil
+}
+
+func (a *App) Run(ctx context.Context) error {
+	logCtx := context.WithoutCancel(ctx)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// gRPC-сервер
+	g.Go(func() error {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.cfg.Grpc.Port))
+		if err != nil {
+			return fmt.Errorf("grpc listen: %w", err)
+		}
+		a.l.Info(logCtx, "grpc server starting", logger.Int("port", a.cfg.Grpc.Port))
+
+		err = a.grpcServer.Serve(lis)
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return nil
+		}
+		return err
+	})
+
+	// http-сервер (health, ready, metrics)
+	g.Go(func() error {
+		a.l.Info(logCtx, "http infra server starting")
+
+		err := a.httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil // после Shutdown это не ошибка
+		}
+		return err
+	})
+
+	// Сторож: спит, пока не придёт сигнал или не упадёт один из серверов
+	g.Go(func() error {
+		<-gctx.Done()
+		return a.shutdown(logCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		a.l.Error(logCtx, "auth-service stopped with error", logger.Error(err))
+		return err
+	}
+	a.l.Info(logCtx, "auth-service stopped gracefully")
+	return nil
+}
+
+// shutdown останавливает оба сервера одновременно
+func (a *App) shutdown(ctx context.Context) error {
+	a.l.Info(ctx, "shutting down")
+
+	timeout, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
+	defer cancel()
+
+	grpcStopped := make(chan struct{})
+	httpStopped := make(chan struct{})
+	allStopped := make(chan struct{})
+	
+
+	go func() {
+		defer close(grpcStopped)
+		a.grpcServer.GracefulStop()
+
+	}()
+	var httpErr error
+	go func() {
+		defer close(httpStopped)
+		httpErr = a.httpServer.Shutdown(timeout)
+	}()
+	go func() {
+		<-grpcStopped
+		<-httpStopped
+		close(allStopped)
+	}()
+
+	select {
+	case <-allStopped:
+		if httpErr != nil {
+			a.httpServer.Close()
+			return fmt.Errorf("http shutdown: %w", httpErr)
+		}
+		a.l.Info(ctx, "grpc and http servers stopped gracefully")
+		return nil
+	case <-timeout.Done():
+		a.l.Error(ctx, "shutdown timed out, forcing stop")
+		a.grpcServer.Stop()
+		a.httpServer.Close()
+		return errors.New("shutdown timeout: servers were stopped forcibly")
+	}
+}
+
+func (a *App) Close() error {
+	a.pool.Close()
+
+	a.l.Sync()
+
+	return nil
+}=== FILE: ./internal/app/infra.go ===
+package app
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("ERROR"))
+			l.Error(ctx, "error on connection to db", logger.Error(err))
+			
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}
+	})
+
+	mux.Handle("/metrics", promhttp.Handler())
+
+	return &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.Infra.Port),
+		Handler: mux,
+	}
+}
+=== FILE: ./internal/service/auth.go ===
+package service
+
+// DeleteUser TODO: проверка: выполнить только если id == callerID || callerRole == admin
+// password validate: if err == bcrypt.ErrPasswordTooLong (>72byte), === FILE: ./internal/repository/repo.go ===
+package repository
+=== FILE: ./internal/transport/grpc/grpc.go ===
+package grpc
+=== FILE: ./internal/authconfig/config.go ===
+package authconfig
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type Config struct {
+	config.Config
+
+	JWT    JWT    `mapstructure:"jwt" yaml:"jwt"`
+	Hasher Hasher `mapstructure:"hasher" yaml:"hasher"`
+}
+
+type JWT struct {
+	AccessTokenTTL  time.Duration `mapstructure:"access_token_ttl" yaml:"access_token_ttl"`
+	RefreshTokenTTL time.Duration `mapstructure:"refresh_token_ttl" yaml:"refresh_token_ttl"`
+	SigningKey      string
+}
+
+type Hasher struct {
+	Cost int `mapstructure:"cost" yaml:"cost"`
+}
+
+const secretKey = "JWT_SECRET"
+const postgresPasswordKey = "POSTGRES_PASSWORD"
+
+func Load() (*Config, error) {
+	cfg := &Config{}
+
+	if err := config.LoadInto(cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.Postgres.Password = os.Getenv(postgresPasswordKey)
+	cfg.JWT.SigningKey = os.Getenv(secretKey)
+
+	if err := config.Validate(&cfg.Config); err != nil {
+		return nil, err
+	}
+
+	if cfg.JWT.SigningKey == "" {
+		return nil, fmt.Errorf("empty JWT secret")
+	}
+	if cfg.JWT.AccessTokenTTL <= 0 {
+		return nil, fmt.Errorf("invalid access token TTL")
+	}
+	if cfg.JWT.RefreshTokenTTL <= 0 {
+		return nil, fmt.Errorf("invalid refresh token TTL")
+	}
+	if cfg.Hasher.Cost < bcrypt.MinCost ||
+		cfg.Hasher.Cost > bcrypt.MaxCost {
+		return nil, fmt.Errorf("invalid bcrypt cost: %d", cfg.Hasher.Cost)
+	}
+
+	return cfg, nil
+}
+=== FILE: ./internal/models/models.go ===
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type User struct {
+	ID           uuid.UUID   `db:"id"`
+	Name         string      `db:"name"`
+	Email        string      `db:"email"`
+	PasswordHash string      `db:"password_hash"`
+	Role         Role        `db:"role"`
+	Premium      PremiumType `db:"premium"`
+
+	AvatarURL string `db:"avatar_url"` // "" = нет аватарки
+	Bio       string `db:"bio"`        // "" = нет описания
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type Role int8
+
+const (
+	RoleUnspecified Role = iota
+	UserRole
+	BannedRole
+	ModeratorRole
+	AdminRole
+)
+
+type PremiumType int8
+
+const (
+	PremiumUnspecified PremiumType = iota
+	Free
+	Premium
+)
+=== FILE: ./Makefile ===
+include config/.env
+export
+
+.PHONY: migrate-up migrate-down migrate-step migrate-step-down run
+
+migrate-up:
+	go run ./cmd/migrate up
+
+migrate-down:
+	go run ./cmd/migrate down
+
+migrate-step:
+	go run ./cmd/migrate step 1
+
+migrate-step-down:
+	go run ./cmd/migrate step -1
+
+run:
+	go run ./cmd/server

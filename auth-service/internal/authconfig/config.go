@@ -19,7 +19,7 @@ type Config struct {
 type JWT struct {
 	AccessTokenTTL  time.Duration `mapstructure:"access_token_ttl" yaml:"access_token_ttl"`
 	RefreshTokenTTL time.Duration `mapstructure:"refresh_token_ttl" yaml:"refresh_token_ttl"`
-	Secret          string
+	SigningKey      string
 }
 
 type Hasher struct {
@@ -37,13 +37,13 @@ func Load() (*Config, error) {
 	}
 
 	cfg.Postgres.Password = os.Getenv(postgresPasswordKey)
-	cfg.JWT.Secret = os.Getenv(secretKey)
+	cfg.JWT.SigningKey = os.Getenv(secretKey)
 
 	if err := config.Validate(&cfg.Config); err != nil {
 		return nil, err
 	}
 
-	if cfg.JWT.Secret == "" {
+	if cfg.JWT.SigningKey == "" {
 		return nil, fmt.Errorf("empty JWT secret")
 	}
 	if cfg.JWT.AccessTokenTTL <= 0 {
