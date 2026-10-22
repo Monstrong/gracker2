@@ -16,3 +16,8 @@ postgres:
 logger:
   level: local
 GracefulShutdownTimeout: 15s
+hasher:
+  cost: 10
+jwt:
+  access_token_ttl: 15m
+  refresh_token_ttl: 24h
