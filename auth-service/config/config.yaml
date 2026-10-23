@@ -1,10 +1,10 @@
 grpc:
   name: auth-service
-  port: 50051
+  port: 50052
   timeout: 5s
 infra:
   name: infra
-  port: 8080
+  port: 8081
   timeout: 5s
 postgres:
   host: localhost
@@ -15,7 +15,7 @@ postgres:
   ssl_mode: disable
 logger:
   level: local
-GracefulShutdownTimeout: 15s
+graceful_shutdown_timeout: 15s
 hasher:
   cost: 10
 jwt:

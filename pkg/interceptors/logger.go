@@ -51,7 +51,11 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 			case errors.As(err, &ve):
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			case errors.Is(err, errs.ErrNotFound),
-				errors.Is(err, errs.ErrAlreadyExists):
+				errors.Is(err, errs.ErrAlreadyExists),
+				errors.Is(err, errs.ErrInvalidCredentials),
+				errors.Is(err, errs.ErrNameAlreadyExists),
+				errors.Is(err, errs.ErrEmailAlreadyExists):
+				
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			case errors.Is(err, context.DeadlineExceeded),
 				errors.Is(err, context.Canceled):
@@ -90,6 +94,15 @@ func toGRPCError(err error) error {
 	}
 	if errors.Is(err, errs.ErrAlreadyExists) {
 		return status.Error(codes.AlreadyExists, errs.ErrAlreadyExists.Error())
+	}
+	if errors.Is(err, errs.ErrInvalidCredentials) { // for auth
+		return status.Error(codes.Unauthenticated, errs.ErrInvalidCredentials.Error())
+	}
+	if errors.Is(err, errs.ErrNameAlreadyExists) { // for auth
+		return status.Error(codes.AlreadyExists, errs.ErrNameAlreadyExists.Error())
+	}
+	if errors.Is(err, errs.ErrEmailAlreadyExists) { // for auth
+		return status.Error(codes.AlreadyExists, errs.ErrEmailAlreadyExists.Error())
 	}
 	return status.Error(codes.Internal, errs.ErrInternal.Error())
 }

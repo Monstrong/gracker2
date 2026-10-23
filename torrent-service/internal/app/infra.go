@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/gracker2/pkg/config"
 	"github.com/monstrong/gracker2/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *http.Server {
+func infraServerInit(pool *pgxpool.Pool, port int, l logger.Logger) *http.Server {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +38,7 @@ func infraServerInit(pool *pgxpool.Pool, cfg *config.Config, l logger.Logger) *h
 	mux.Handle("/metrics", promhttp.Handler())
 
 	return &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Infra.Port),
+		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
 	}
 }

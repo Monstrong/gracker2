@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -57,8 +58,8 @@ func LoadInto(target any) error {
 		return fmt.Errorf("error reading config.yaml: %w", err)
 	}
 
-	if err := godotenv.Load(configEnvPath); err != nil {
-		return fmt.Errorf("error reading .env: %w", err)
+	if err := godotenv.Load(configEnvPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Println("no .env file found")
 	}
 
 	v.AutomaticEnv()

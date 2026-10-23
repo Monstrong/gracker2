@@ -10,7 +10,7 @@ import (
 )
 
 type Config struct {
-	config.Config
+	config.Config `mapstructure:",squash"`
 
 	JWT    JWT    `mapstructure:"jwt" yaml:"jwt"`
 	Hasher Hasher `mapstructure:"hasher" yaml:"hasher"`
@@ -52,6 +52,7 @@ func Load() (*Config, error) {
 	if cfg.JWT.RefreshTokenTTL <= 0 {
 		return nil, fmt.Errorf("invalid refresh token TTL")
 	}
+	
 	if cfg.Hasher.Cost < bcrypt.MinCost ||
 		cfg.Hasher.Cost > bcrypt.MaxCost {
 		return nil, fmt.Errorf("invalid bcrypt cost: %d", cfg.Hasher.Cost)

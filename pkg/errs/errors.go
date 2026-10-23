@@ -3,12 +3,13 @@ package errs
 import "errors"
 
 var (
-	ErrNotFound      = errors.New("record not found")
-	ErrInternal      = errors.New("internal server error")
-	ErrAlreadyExists = errors.New("record already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials") // for auth
+	ErrNotFound           = errors.New("record not found")
+	ErrInternal           = errors.New("internal server error")
+	ErrAlreadyExists      = errors.New("record already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials")  // for auth
+	ErrNameAlreadyExists  = errors.New("name already exists")  // for auth
+	ErrEmailAlreadyExists  = errors.New("email already exists") // for auth
 )
-
 
 // insted of ErrInvalidData
 type ValidationError struct {
@@ -19,4 +20,3 @@ type ValidationError struct {
 func (e *ValidationError) Error() string {
 	return e.Reason
 }
-
