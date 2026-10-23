@@ -21,6 +21,13 @@ type User struct {
 	UpdatedAt time.Time `db:"updated_at"`
 }
 
+type UserPatch struct {
+	Name         *string `json:"name"`
+	Email        *string `json:"email"`
+	AvatarURL    *string `json:"avatar_url"`
+	Bio          *string `json:"bio"`
+}
+
 type Role int8
 
 const (

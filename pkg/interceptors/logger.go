@@ -54,7 +54,8 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 				errors.Is(err, errs.ErrAlreadyExists),
 				errors.Is(err, errs.ErrInvalidCredentials),
 				errors.Is(err, errs.ErrNameAlreadyExists),
-				errors.Is(err, errs.ErrEmailAlreadyExists):
+				errors.Is(err, errs.ErrEmailAlreadyExists),
+				errors.Is(err, errs.ErrUserPatchEmpty):
 				
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			case errors.Is(err, context.DeadlineExceeded),
@@ -94,6 +95,9 @@ func toGRPCError(err error) error {
 	}
 	if errors.Is(err, errs.ErrAlreadyExists) {
 		return status.Error(codes.AlreadyExists, errs.ErrAlreadyExists.Error())
+	}
+	if errors.Is(err, errs.ErrUserPatchEmpty) {
+		return status.Error(codes.InvalidArgument, errs.ErrUserPatchEmpty.Error())
 	}
 	if errors.Is(err, errs.ErrInvalidCredentials) { // for auth
 		return status.Error(codes.Unauthenticated, errs.ErrInvalidCredentials.Error())

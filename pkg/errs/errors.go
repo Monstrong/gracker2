@@ -9,6 +9,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")  // for auth
 	ErrNameAlreadyExists  = errors.New("name already exists")  // for auth
 	ErrEmailAlreadyExists  = errors.New("email already exists") // for auth
+	ErrUserPatchEmpty     = errors.New("user patch is empty")
 )
 
 // insted of ErrInvalidData
