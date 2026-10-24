@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/domain"
 )
 
 type User struct {
@@ -28,20 +29,20 @@ type UserPatch struct {
 	Bio          *string `json:"bio"`
 }
 
-type Role int8
+type Role = domain.Role
 
 const (
-	RoleUnspecified Role = iota
-	UserRole
-	BannedRole
-	ModeratorRole
-	AdminRole
+	RoleUnspecified Role = domain.RoleUnspecified
+	UserRole        Role = domain.UserRole
+	BannedRole      Role = domain.BannedRole
+	ModeratorRole   Role = domain.ModeratorRole
+	AdminRole       Role = domain.AdminRole
 )
 
-type PremiumType int8
+type PremiumType = domain.PremiumType
 
 const (
-	PremiumUnspecified PremiumType = iota
-	Free
-	Premium
+	PremiumUnspecified PremiumType = domain.PremiumUnspecified
+	Free               PremiumType = domain.Free
+	Premium            PremiumType = domain.Premium
 )

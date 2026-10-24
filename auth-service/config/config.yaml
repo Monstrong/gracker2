@@ -13,6 +13,12 @@ postgres:
   dbname: gracker_users
   max_conns: 10
   ssl_mode: disable
+redis:
+  addr: "localhost:6379"
+  db: 0
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
 logger:
   level: local
 graceful_shutdown_timeout: 15s

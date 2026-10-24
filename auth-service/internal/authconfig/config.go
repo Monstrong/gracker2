@@ -14,6 +14,7 @@ type Config struct {
 
 	JWT    JWT    `mapstructure:"jwt" yaml:"jwt"`
 	Hasher Hasher `mapstructure:"hasher" yaml:"hasher"`
+	Redis  Redis  `mapstructure:"redis" yaml:"redis"`
 }
 
 type JWT struct {
@@ -22,12 +23,22 @@ type JWT struct {
 	SigningKey      string
 }
 
+type Redis struct {
+    Addr         string        `mapstructure:"addr"`
+    Password     string        
+    DB           int           `mapstructure:"db"`
+    DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+    ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+    WriteTimeout time.Duration `mapstructure:"write_timeout"`
+}
+
 type Hasher struct {
 	Cost int `mapstructure:"cost" yaml:"cost"`
 }
 
 const secretKey = "JWT_SECRET"
 const postgresPasswordKey = "POSTGRES_PASSWORD"
+const redisPasswordKey = "REDIS_PASSWORD"
 
 func Load() (*Config, error) {
 	cfg := &Config{}
@@ -38,6 +49,7 @@ func Load() (*Config, error) {
 
 	cfg.Postgres.Password = os.Getenv(postgresPasswordKey)
 	cfg.JWT.SigningKey = os.Getenv(secretKey)
+	cfg.Redis.Password = os.Getenv(redisPasswordKey)
 
 	if err := config.Validate(&cfg.Config); err != nil {
 		return nil, err

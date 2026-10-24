@@ -16,6 +16,9 @@ import (
 
 var psql = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
+type UserRepository interface {
+	
+}
 type PostgresRepository struct {
 	db *pgxpool.Pool
 }
@@ -196,7 +199,7 @@ func (r *PostgresRepository) ChangePassword(ctx context.Context, id uuid.UUID, n
 func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.User, error) {
 	const op = "repo.Postgres.UpdateUser"
 
-	b := sq.Update("users")
+	b := psql.Update("users")
 
 	if u.Name == nil && u.Email == nil && u.AvatarURL == nil && u.Bio == nil {
 		return nil, fmt.Errorf("%s: %w", op, errs.ErrUserPatchEmpty)
@@ -254,23 +257,6 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch
 	}
 
 	return &nu, nil
-
-}
-
-func (r *PostgresRepository) CreateRefreshToken(ctx context.Context, id uuid.UUID, token string) (bool, error) {
-	const op = "repo.Postgres.CreateRefreshToken"
-	tag, err := r.db.Exec(ctx, `INSERT INTO refresh_tokens (user_id, token) VALUES ($1, $2)`, id, token)
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
-	}
-	return tag.RowsAffected() == 1, nil
-}
-
-func (r *PostgresRepository) RotateRefreshToken(ctx context.Context, id uuid.UUID, token string) error {
-
-}
-
-func (r *PostgresRepository) RevokeRefreshTokens(ctx context.Context, id uuid.UUID, token string) (bool, error) {
 
 }
 
