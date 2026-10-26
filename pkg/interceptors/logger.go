@@ -115,10 +115,10 @@ func toGRPCError(err error) error {
 		return status.Error(codes.PermissionDenied, errs.ErrPermissionDenied.Error())
 	}
 	if errors.Is(err, errs.ErrPasswordMismatch) {
-		return status.Error(codes.PermissionDenied, errs.ErrPasswordMismatch.Error())
+		return status.Error(codes.Unauthenticated, errs.ErrPasswordMismatch.Error())
 	}
 	if errors.Is(err, errs.ErrNoUpdates) {
-		return nil
+		return nil // TODO: ченибудь придумать
 	}
 	return status.Error(codes.Internal, errs.ErrInternal.Error())
 }

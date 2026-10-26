@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/pkg/domain"
 )
 
@@ -19,7 +20,7 @@ type Manager struct {
 }
 
 type Claims struct {
-	UserID  string             `json:"user_id"`
+	UserID  uuid.UUID             `json:"user_id"`
 	Role    domain.Role        `json:"role"`
 	Premium domain.PremiumType `json:"premium"`
 	jwt.RegisteredClaims

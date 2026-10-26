@@ -7,11 +7,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type Hasher interface {
-	HashPassword(password string) (string, error)
-	CheckPassword(password, hash string) error
-}
-
 type SimpleHasher struct{
 	cost int
 }

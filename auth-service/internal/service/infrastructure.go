@@ -15,8 +15,8 @@ import (
 )
 
 type UserService struct {
-	m jwtmanager.TokenManager
-	h hasher.Hasher
+	m TokenManager
+	h Hasher
 
 	urepo  UserRepository
 	rfrepo RefreshRepository
@@ -31,6 +31,16 @@ func New(cfg *authconfig.Config, pool *pgxpool.Pool, rclient *redis.Client) *Use
 	}
 }
 
+type Hasher interface {
+	HashPassword(password string) (string, error)
+	CheckPassword(password, hash string) error
+}
+
+type TokenManager interface {
+	NewToken(userID uuid.UUID, role models.Role, premium models.PremiumType) (string, error)
+	NewRefreshToken() (string, error)
+	RefreshTTL() time.Duration
+}
 
 type UserRepository interface {
 	RegisterNewUser(ctx context.Context, user *models.User) (uuid.UUID, error)
@@ -48,7 +58,6 @@ type UserRepository interface {
 
 type RefreshRepository interface {
 	SetRefreshToken(ctx context.Context, tokenHash, userID string, ttl time.Duration) error
-	GetRefreshToken(ctx context.Context, tokenHash string) (string, error)
 	DeleteRefreshToken(ctx context.Context, tokenHash string) error
 	RotateRefreshToken(ctx context.Context, oldTokenHash, newTokenHash string, ttl time.Duration) (string, error)
 }

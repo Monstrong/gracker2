@@ -6,14 +6,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/auth-service/internal/models"
 	"github.com/monstrong/gracker2/pkg/jwtparser"
 )
-
-type TokenManager interface {
-	NewToken(userID string, role models.Role, premium models.PremiumType) (string, error)
-	NewRefreshToken() (string, error)
-}
 
 type Manager struct {
 	signingKey      string
@@ -31,7 +27,7 @@ func NewManager(signingKey string, accessTokenTTL time.Duration, refreshTokenTTL
 	}
 }
 
-func (m *Manager) NewToken(userID string, role models.Role, premium models.PremiumType) (string, error) {
+func (m *Manager) NewToken(userID uuid.UUID, role models.Role, premium models.PremiumType) (string, error) {
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		UserID:  userID,
 		Role:    role,
@@ -57,4 +53,8 @@ func (m *Manager) NewRefreshToken() (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", b), nil
+}
+
+func (m *Manager) RefreshTTL() time.Duration {
+	return m.refreshTokenTTL
 }

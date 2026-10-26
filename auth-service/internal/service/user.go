@@ -248,6 +248,7 @@ func validateEmail(email string) error {
 }
 
 func validatePassword(password string) error {
+	// validatePassword: len > 72
 	return nil
 }
 
