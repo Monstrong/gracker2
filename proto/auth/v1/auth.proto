@@ -1,12 +1,14 @@
 syntax = "proto3";
 package auth.v1;
+import "google/protobuf/timestamp.proto";
 option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
 
 service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Refresh(RefreshRequest) returns (RefreshResponse);
-  rpc Validate(ValidateRequest) returns (ValidateResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // rpc Validate(ValidateRequest) returns (ValidateResponse); - ПЕРЕНОС В API-GATEWAY
 
   rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
   rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse);
@@ -97,14 +99,19 @@ message ChangePasswordRequest {
 
 message ChangePasswordResponse { bool updated = 1; }
 
+message LogoutRequest {}
+message LogoutResponse {}
+
 message PublicUser {
   string  id         = 1;
   string  name       = 2;
   reserved 3;       // был email
   Role    role       = 4;
-  reserved 5;        // был premium
+  Premium premium    = 5;
   string  avatar_url = 6;
   string  bio        = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 message User {
@@ -115,14 +122,18 @@ message User {
   Premium premium    = 5;
   string  avatar_url = 6;
   string  bio        = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 enum Role {
   ROLE_UNSPECIFIED = 0;
-  ROLE_USER = 1;
-  ROLE_BANNED = 2;
+  ROLE_BANNED = 1;
+  ROLE_USER = 2;
   ROLE_MODERATOR = 3;
   ROLE_ADMIN = 4;
+  ROLE_OWNER = 5;
+  ROLE_BILLING = 6;
 }
 
 enum Premium {

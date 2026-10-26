@@ -9,6 +9,7 @@ package v1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -1282,8 +1283,11 @@ type PublicUser struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=auth.v1.Role" json:"role,omitempty"`
+	Premium       Premium                `protobuf:"varint,5,opt,name=premium,proto3,enum=auth.v1.Premium" json:"premium,omitempty"`
 	AvatarUrl     string                 `protobuf:"bytes,6,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
 	Bio           string                 `protobuf:"bytes,7,opt,name=bio,proto3" json:"bio,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1339,6 +1343,13 @@ func (x *PublicUser) GetRole() Role {
 	return Role_ROLE_UNSPECIFIED
 }
 
+func (x *PublicUser) GetPremium() Premium {
+	if x != nil {
+		return x.Premium
+	}
+	return Premium_PREMIUM_UNSPECIFIED
+}
+
 func (x *PublicUser) GetAvatarUrl() string {
 	if x != nil {
 		return x.AvatarUrl
@@ -1353,6 +1364,20 @@ func (x *PublicUser) GetBio() string {
 	return ""
 }
 
+func (x *PublicUser) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *PublicUser) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 type User struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1362,6 +1387,8 @@ type User struct {
 	Premium       Premium                `protobuf:"varint,5,opt,name=premium,proto3,enum=auth.v1.Premium" json:"premium,omitempty"`
 	AvatarUrl     string                 `protobuf:"bytes,6,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
 	Bio           string                 `protobuf:"bytes,7,opt,name=bio,proto3" json:"bio,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1445,11 +1472,25 @@ func (x *User) GetBio() string {
 	return ""
 }
 
+func (x *User) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *User) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 var File_proto_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x18proto/auth/v1/auth.proto\x12\aauth.v1\"@\n" +
+	"\x18proto/auth/v1/auth.proto\x12\aauth.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"@\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"W\n" +
@@ -1515,15 +1556,20 @@ const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\fold_password\x18\x01 \x01(\tR\voldPassword\x12!\n" +
 	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\"2\n" +
 	"\x16ChangePasswordResponse\x12\x18\n" +
-	"\aupdated\x18\x01 \x01(\bR\aupdated\"\x90\x01\n" +
+	"\aupdated\x18\x01 \x01(\bR\aupdated\"\xac\x02\n" +
 	"\n" +
 	"PublicUser\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
-	"\x04role\x18\x04 \x01(\x0e2\r.auth.v1.RoleR\x04role\x12\x1d\n" +
+	"\x04role\x18\x04 \x01(\x0e2\r.auth.v1.RoleR\x04role\x12*\n" +
+	"\apremium\x18\x05 \x01(\x0e2\x10.auth.v1.PremiumR\apremium\x12\x1d\n" +
 	"\n" +
 	"avatar_url\x18\x06 \x01(\tR\tavatarUrl\x12\x10\n" +
-	"\x03bio\x18\a \x01(\tR\x03bioJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06\"\xc0\x01\n" +
+	"\x03bio\x18\a \x01(\tR\x03bio\x129\n" +
+	"\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtJ\x04\b\x03\x10\x04\"\xb6\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -1532,7 +1578,11 @@ const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\apremium\x18\x05 \x01(\x0e2\x10.auth.v1.PremiumR\apremium\x12\x1d\n" +
 	"\n" +
 	"avatar_url\x18\x06 \x01(\tR\tavatarUrl\x12\x10\n" +
-	"\x03bio\x18\a \x01(\tR\x03bio*`\n" +
+	"\x03bio\x18\a \x01(\tR\x03bio\x129\n" +
+	"\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*`\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tROLE_USER\x10\x01\x12\x0f\n" +
@@ -1604,6 +1654,7 @@ var file_proto_auth_v1_auth_proto_goTypes = []any{
 	(*ChangePasswordResponse)(nil), // 25: auth.v1.ChangePasswordResponse
 	(*PublicUser)(nil),             // 26: auth.v1.PublicUser
 	(*User)(nil),                   // 27: auth.v1.User
+	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
 }
 var file_proto_auth_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: auth.v1.ValidateResponse.role:type_name -> auth.v1.Role
@@ -1615,37 +1666,42 @@ var file_proto_auth_v1_auth_proto_depIdxs = []int32{
 	27, // 6: auth.v1.AdminGetUserResponse.user:type_name -> auth.v1.User
 	27, // 7: auth.v1.UpdateUserResponse.user:type_name -> auth.v1.User
 	0,  // 8: auth.v1.PublicUser.role:type_name -> auth.v1.Role
-	0,  // 9: auth.v1.User.role:type_name -> auth.v1.Role
-	1,  // 10: auth.v1.User.premium:type_name -> auth.v1.Premium
-	2,  // 11: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
-	4,  // 12: auth.v1.AuthService.Register:input_type -> auth.v1.RegisterRequest
-	6,  // 13: auth.v1.AuthService.Refresh:input_type -> auth.v1.RefreshRequest
-	8,  // 14: auth.v1.AuthService.Validate:input_type -> auth.v1.ValidateRequest
-	10, // 15: auth.v1.AuthService.RoleUpdate:input_type -> auth.v1.RoleUpdateRequest
-	12, // 16: auth.v1.AuthService.PremiumUpdate:input_type -> auth.v1.PremiumUpdateRequest
-	14, // 17: auth.v1.AuthService.GetMe:input_type -> auth.v1.GetMeRequest
-	16, // 18: auth.v1.AuthService.GetUser:input_type -> auth.v1.GetUserRequest
-	20, // 19: auth.v1.AuthService.AdminGetUser:input_type -> auth.v1.AdminGetUserRequest
-	22, // 20: auth.v1.AuthService.UpdateUser:input_type -> auth.v1.UpdateUserRequest
-	18, // 21: auth.v1.AuthService.DeleteUser:input_type -> auth.v1.DeleteUserRequest
-	24, // 22: auth.v1.AuthService.ChangePassword:input_type -> auth.v1.ChangePasswordRequest
-	3,  // 23: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
-	5,  // 24: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
-	7,  // 25: auth.v1.AuthService.Refresh:output_type -> auth.v1.RefreshResponse
-	9,  // 26: auth.v1.AuthService.Validate:output_type -> auth.v1.ValidateResponse
-	13, // 27: auth.v1.AuthService.RoleUpdate:output_type -> auth.v1.RoleUpdateResponse
-	11, // 28: auth.v1.AuthService.PremiumUpdate:output_type -> auth.v1.PremiumUpdateResponse
-	15, // 29: auth.v1.AuthService.GetMe:output_type -> auth.v1.GetMeResponse
-	17, // 30: auth.v1.AuthService.GetUser:output_type -> auth.v1.GetUserResponse
-	21, // 31: auth.v1.AuthService.AdminGetUser:output_type -> auth.v1.AdminGetUserResponse
-	23, // 32: auth.v1.AuthService.UpdateUser:output_type -> auth.v1.UpdateUserResponse
-	19, // 33: auth.v1.AuthService.DeleteUser:output_type -> auth.v1.DeleteUserResponse
-	25, // 34: auth.v1.AuthService.ChangePassword:output_type -> auth.v1.ChangePasswordResponse
-	23, // [23:35] is the sub-list for method output_type
-	11, // [11:23] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	1,  // 9: auth.v1.PublicUser.premium:type_name -> auth.v1.Premium
+	28, // 10: auth.v1.PublicUser.created_at:type_name -> google.protobuf.Timestamp
+	28, // 11: auth.v1.PublicUser.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 12: auth.v1.User.role:type_name -> auth.v1.Role
+	1,  // 13: auth.v1.User.premium:type_name -> auth.v1.Premium
+	28, // 14: auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	28, // 15: auth.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	2,  // 16: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
+	4,  // 17: auth.v1.AuthService.Register:input_type -> auth.v1.RegisterRequest
+	6,  // 18: auth.v1.AuthService.Refresh:input_type -> auth.v1.RefreshRequest
+	8,  // 19: auth.v1.AuthService.Validate:input_type -> auth.v1.ValidateRequest
+	10, // 20: auth.v1.AuthService.RoleUpdate:input_type -> auth.v1.RoleUpdateRequest
+	12, // 21: auth.v1.AuthService.PremiumUpdate:input_type -> auth.v1.PremiumUpdateRequest
+	14, // 22: auth.v1.AuthService.GetMe:input_type -> auth.v1.GetMeRequest
+	16, // 23: auth.v1.AuthService.GetUser:input_type -> auth.v1.GetUserRequest
+	20, // 24: auth.v1.AuthService.AdminGetUser:input_type -> auth.v1.AdminGetUserRequest
+	22, // 25: auth.v1.AuthService.UpdateUser:input_type -> auth.v1.UpdateUserRequest
+	18, // 26: auth.v1.AuthService.DeleteUser:input_type -> auth.v1.DeleteUserRequest
+	24, // 27: auth.v1.AuthService.ChangePassword:input_type -> auth.v1.ChangePasswordRequest
+	3,  // 28: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
+	5,  // 29: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
+	7,  // 30: auth.v1.AuthService.Refresh:output_type -> auth.v1.RefreshResponse
+	9,  // 31: auth.v1.AuthService.Validate:output_type -> auth.v1.ValidateResponse
+	13, // 32: auth.v1.AuthService.RoleUpdate:output_type -> auth.v1.RoleUpdateResponse
+	11, // 33: auth.v1.AuthService.PremiumUpdate:output_type -> auth.v1.PremiumUpdateResponse
+	15, // 34: auth.v1.AuthService.GetMe:output_type -> auth.v1.GetMeResponse
+	17, // 35: auth.v1.AuthService.GetUser:output_type -> auth.v1.GetUserResponse
+	21, // 36: auth.v1.AuthService.AdminGetUser:output_type -> auth.v1.AdminGetUserResponse
+	23, // 37: auth.v1.AuthService.UpdateUser:output_type -> auth.v1.UpdateUserResponse
+	19, // 38: auth.v1.AuthService.DeleteUser:output_type -> auth.v1.DeleteUserResponse
+	25, // 39: auth.v1.AuthService.ChangePassword:output_type -> auth.v1.ChangePasswordResponse
+	28, // [28:40] is the sub-list for method output_type
+	16, // [16:28] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_proto_auth_v1_auth_proto_init() }

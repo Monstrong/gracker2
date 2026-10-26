@@ -16,15 +16,13 @@ import (
 
 var psql = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
-type UserRepository interface {
-	
-}
 type PostgresRepository struct {
 	db *pgxpool.Pool
 }
 
-const PrivateFieldsMessageString = "NO_INFO"
+
 const userColumns = `id, name, email, role, premium, avatar_url, bio, created_at, updated_at`
+const userPublicColumns = `id, name, role, premium, avatar_url, bio, created_at, updated_at`
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{
@@ -76,13 +74,13 @@ func (r *PostgresRepository) RegisterNewUser(ctx context.Context, user *models.U
 }
 
 // GetUserPublic gives user PUBLIC PROFILE
-func (r *PostgresRepository) GetUserPublic(ctx context.Context, id uuid.UUID) (*models.User, error) {
+func (r *PostgresRepository) GetUserPublic(ctx context.Context, id uuid.UUID) (*models.UserPublic, error) {
 	const op = "repo.Postgres.GetUserPublic"
 
-	var u models.User
-	query := fmt.Sprintf(`SELECT %s FROM users WHERE id = $1`, userColumns)
+	var u models.UserPublic
+	query := fmt.Sprintf(`SELECT %s FROM users WHERE id = $1`, userPublicColumns)
 
-	err := r.scanInUwhereX(ctx, query, id, &u)
+	err := r.scanInUPubliWwhereX(ctx, query, id, &u)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -91,18 +89,17 @@ func (r *PostgresRepository) GetUserPublic(ctx context.Context, id uuid.UUID) (*
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	u.Email = PrivateFieldsMessageString
 	return &u, nil
 }
 
 // GetUserPrivate gives user PRIVATE PROFILE
-func (r *PostgresRepository) GetUserPrivate(ctx context.Context, id uuid.UUID) (*models.User, error) {
+func (r *PostgresRepository) GetUserPrivate(ctx context.Context, id uuid.UUID) (*models.UserPrivate, error) {
 	const op = "repo.Postgres.GetUserPrivate"
 
-	var u models.User
+	var u models.UserPrivate
 	query := fmt.Sprintf(`SELECT %s FROM users WHERE id = $1`, userColumns)
 
-	err := r.scanInUwhereX(ctx, query, id, &u)
+	err := r.scanInUPrivateWhereX(ctx, query, id, &u)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -153,6 +150,19 @@ func (r *PostgresRepository) UpdateUserRole(ctx context.Context, id uuid.UUID, r
 	return tag.RowsAffected() == 1, nil
 }
 
+func (r *PostgresRepository) GetRole(ctx context.Context, id uuid.UUID) (models.Role, error) {
+	const op = "repo.Postgres.GetRole"
+
+	var role models.Role
+	err := r.db.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, id).Scan(&role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.RoleUnspecified, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return models.RoleUnspecified, fmt.Errorf("%s: %w", op, err)
+	}
+	return role, nil
+}
 func (r *PostgresRepository) UpdateUserPremium(ctx context.Context, id uuid.UUID, premium models.PremiumType) (updated bool, err error) {
 	const op = "repo.Postgres.UpdateUserPremium"
 
@@ -196,14 +206,11 @@ func (r *PostgresRepository) ChangePassword(ctx context.Context, id uuid.UUID, n
 	}
 	return tag.RowsAffected() == 1, nil
 }
-func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.User, error) {
+func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.UserPrivate, error) {
 	const op = "repo.Postgres.UpdateUser"
 
 	b := psql.Update("users")
 
-	if u.Name == nil && u.Email == nil && u.AvatarURL == nil && u.Bio == nil {
-		return nil, fmt.Errorf("%s: %w", op, errs.ErrUserPatchEmpty)
-	}
 	if u.Name != nil {
 		b = b.Set("name", *u.Name)
 	}
@@ -225,7 +232,7 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-	var nu models.User
+	var nu models.UserPrivate
 	err = r.db.QueryRow(ctx, query, args...).Scan(
 		&nu.ID,
 		&nu.Name,
@@ -260,8 +267,22 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch
 
 }
 
-// scanInUwhereX scans user in models.User by some parametr. DOES NOT SCAN PASSWORD
-func (r *PostgresRepository) scanInUwhereX(ctx context.Context, query string, x any, u *models.User) error {
+
+func (r *PostgresRepository) scanInUPubliWwhereX(ctx context.Context, query string, x any, u *models.UserPublic) error {
+	err := r.db.QueryRow(ctx, query, x).Scan(
+		&u.ID,
+		&u.Name,
+		&u.Role,
+		&u.Premium,
+		&u.AvatarURL,
+		&u.Bio,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	return err
+}
+
+func (r *PostgresRepository) scanInUPrivateWhereX(ctx context.Context, query string, x any, u *models.UserPrivate) error {
 	err := r.db.QueryRow(ctx, query, x).Scan(
 		&u.ID,
 		&u.Name,
@@ -273,6 +294,5 @@ func (r *PostgresRepository) scanInUwhereX(ctx context.Context, query string, x 
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
-
 	return err
 }
