@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -12,6 +11,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
 )
 
 func main() {
@@ -21,14 +21,7 @@ func main() {
 	}
 	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.Postgres.User, 
-		cfg.Postgres.Password, 
-		cfg.Postgres.Host,
-		cfg.Postgres.Port,
-		cfg.Postgres.DBName,
-		cfg.Postgres.SSLMode,
-	)
+	dsn := db.BuildDSN(&cfg.Postgres)
 
 	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {
@@ -40,8 +33,8 @@ func main() {
 		l.Error("add command")
 		os.Exit(1)
 	}
-	comand := os.Args[1]
-	switch comand {
+	command := os.Args[1]
+	switch command {
 	case "up":
 		err = m.Up()
 	case "down":
@@ -71,3 +64,4 @@ func main() {
 		}
 	}
 }
+

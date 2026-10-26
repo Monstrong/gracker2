@@ -56,6 +56,12 @@ func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error)
 func (s *TorrentService) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
 	const op = "service.torrentService.list"
 
+	if limit <= 0 || limit > models.MaxLimit {
+		return nil, &errs.ValidationError{Field: "limit", Reason: "invalid limit"}
+	}
+	if offset < 0 || offset > models.MaxOffset {
+		return nil, &errs.ValidationError{Field: "offset", Reason: "invalid offset"}
+	}
 	ms, err := s.r.List(ctx, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)

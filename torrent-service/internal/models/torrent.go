@@ -17,3 +17,8 @@ type Torrent struct {
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
 }
+
+const (
+	MaxLimit = 200
+	MaxOffset = 1000000
+)

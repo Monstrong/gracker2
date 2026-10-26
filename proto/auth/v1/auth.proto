@@ -1,24 +1,143 @@
 syntax = "proto3";
 package auth.v1;
+import "google/protobuf/timestamp.proto";
 option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
 
 service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // rpc Validate(ValidateRequest) returns (ValidateResponse); - ПЕРЕНОС В API-GATEWAY
+
+  rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
+  rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse);
+
+    
+  rpc GetMe(GetMeRequest) returns (GetMeResponse); // Свой профиль 
+  rpc GetUser(GetUserRequest) returns (GetUserResponse); // без email
+
+  rpc AdminGetUser(AdminGetUserRequest) returns (AdminGetUserResponse); // админу понадобился email
+
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
 }
 
 message LoginRequest {
-  
+  string email = 1;
+  string password = 2;
 }
 
 message LoginResponse {
-  
+  string access_token = 1;
+  string refresh_token = 2;
 }
 
 message RegisterRequest {
-  
+  string name = 1;
+  string email = 2;
+  string password = 3;
 }
 
-message RegisterResponse {
-  
+message RegisterResponse { string id = 1; }
+
+message RefreshRequest { string refresh_token = 1; }
+
+message RefreshResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message ValidateRequest { string access_token = 1; }
+
+message ValidateResponse {
+  string id = 1;
+  Role role = 2;
+  Premium premium = 3;
+}
+
+message RoleUpdateRequest {
+  string target_user_id = 1;
+  Role new_role = 2;
+}
+
+message PremiumUpdateResponse {  bool updated = 1; }
+
+message PremiumUpdateRequest {
+  string target_user_id = 1;
+  Premium new_premium = 2;
+}
+
+message RoleUpdateResponse { bool updated = 1; }
+
+message GetMeRequest {}
+message GetMeResponse { User user = 1; }
+
+message GetUserRequest { string id = 1; }
+message GetUserResponse { PublicUser user = 1; }
+
+message DeleteUserRequest {  string id = 1; } // id == callerID || callerRole == admin
+message DeleteUserResponse { bool deleted = 1; }
+
+message AdminGetUserRequest { string id = 1; }
+message AdminGetUserResponse { User user = 1; }
+message UpdateUserRequest {
+  optional string name  = 1;
+  optional string email = 2;
+  optional string avatar_url = 3;
+  optional string bio = 4;
+}
+
+message UpdateUserResponse { User user = 1; }
+
+message ChangePasswordRequest {
+  string old_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse { bool updated = 1; }
+
+message LogoutRequest {}
+message LogoutResponse {}
+
+message PublicUser {
+  string  id         = 1;
+  string  name       = 2;
+  reserved 3;       // был email
+  Role    role       = 4;
+  Premium premium    = 5;
+  string  avatar_url = 6;
+  string  bio        = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message User {
+  string  id         = 1;
+  string  name       = 2;
+  string  email      = 3;
+  Role    role       = 4;
+  Premium premium    = 5;
+  string  avatar_url = 6;
+  string  bio        = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_BANNED = 1;
+  ROLE_USER = 2;
+  ROLE_MODERATOR = 3;
+  ROLE_ADMIN = 4;
+  ROLE_OWNER = 5;
+  ROLE_BILLING = 6;
+}
+
+enum Premium {
+  PREMIUM_UNSPECIFIED = 0;
+  PREMIUM_FREE = 1;
+  PREMIUM_PREMIUM = 2;
 }

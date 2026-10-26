@@ -8,20 +8,20 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/gracker2/pkg/config"
-	"github.com/monstrong/gracker2/pkg/db"
-	"github.com/monstrong/gracker2/pkg/interceptors"
-	"github.com/monstrong/gracker2/pkg/logger"
-	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	"github.com/monstrong/gracker2/auth-service/internal/authconfig"
 	"github.com/monstrong/gracker2/auth-service/internal/repository"
 	"github.com/monstrong/gracker2/auth-service/internal/service"
 	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/pkg/logger"
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
 type App struct {
-	cfg        *config.Config
+	cfg        *authconfig.Config
 	l          logger.Logger
 	pool       *pgxpool.Pool
 	grpcServer *grpc.Server
@@ -29,7 +29,7 @@ type App struct {
 }
 
 func New(ctx context.Context) (*App, error) {
-	cfg, err := config.Load()
+	cfg, err := authconfig.Load()
 	if err != nil {
 		return nil, fmt.Errorf("init config: %w", err)
 	}
@@ -48,7 +48,7 @@ func New(ctx context.Context) (*App, error) {
 	l.Info(ctx, "db pool init complete")
 
 	repo := repository.NewPostgresRepository(pool)
-	svc := service.NewTorrentService(repo)
+	svc := service.NewAuthService(repo)
 	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(
@@ -57,9 +57,9 @@ func New(ctx context.Context) (*App, error) {
 			interceptors.LoggingInterceptor(l),
 			interceptors.TimeoutInterceptor(&cfg.Grpc),
 		))
-	pb.RegisterTorrentServiceServer(grpcServer, handler)
+	pb.RegisterAuthServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(pool, cfg, l)
+	httpServer := infraServerInit(pool, cfg.Infra.Port, l)
 
 	return &App{
 		cfg:        cfg,
@@ -108,10 +108,10 @@ func (a *App) Run(ctx context.Context) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		a.l.Error(logCtx, "torrent-service stopped with error", logger.Error(err))
+		a.l.Error(logCtx, "auth-service stopped with error", logger.Error(err))
 		return err
 	}
-	a.l.Info(logCtx, "torrent-service stopped gracefully")
+	a.l.Info(logCtx, "auth-service stopped gracefully")
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// base config struct. use it in your custom ones.
 type Config struct {
 	Grpc     Grpc     `mapstructure:"grpc" yaml:"grpc"`
 	Infra    Infra    `mapstructure:"infra" yaml:"infra"`
@@ -46,19 +48,36 @@ const configYamlPath = "config/config.yaml"
 const configEnvPath = "config/.env"
 const postgresPasswordName = "POSTGRES_PASSWORD"
 
-func Load() (*Config, error) {
-	cfg := &Config{}
+
+// use it in your custom config struct
+func LoadInto(target any) error {
 	v := viper.New()
 	v.SetConfigFile(configYamlPath)
+
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("error reading config.yaml:%w", err)
+		return fmt.Errorf("error reading config.yaml: %w", err)
 	}
 
-	_ = godotenv.Load(configEnvPath)
+	if err := godotenv.Load(configEnvPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Println("no .env file found")
+	}
+
 	v.AutomaticEnv()
 
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("unmarshal config: %w", err)
+	if err := v.Unmarshal(target); err != nil {
+		return fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	return nil
+}
+
+// old func, better use LoadInto with your custom config struct
+// migrations or small services use this
+func Load() (*Config, error) { 
+	cfg := &Config{}
+
+	if err := LoadInto(cfg); err != nil {
+		return nil, err
 	}
 
 	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
@@ -66,11 +85,14 @@ func Load() (*Config, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
+
 	return cfg, nil
 }
 
-
-// 
+// use it in your custom config struct
+func Validate(cfg *Config) error {
+	return cfg.validate()
+}
 func (c *Config) validate() error {
 	switch {
 	// grpc

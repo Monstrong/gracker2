@@ -1,10 +1,11 @@
 grpc:
   name: auth-service
-  port: 50051
+  port: 50052
   timeout: 5s
 infra:
   name: infra
-  port: 8080
+  port: 8081
+  timeout: 5s
 postgres:
   host: localhost
   port: 5432
@@ -12,5 +13,17 @@ postgres:
   dbname: gracker_users
   max_conns: 10
   ssl_mode: disable
+redis:
+  addr: "localhost:6379"
+  db: 0
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
 logger:
   level: local
+graceful_shutdown_timeout: 15s
+hasher:
+  cost: 10
+jwt:
+  access_token_ttl: 15m
+  refresh_token_ttl: 24h

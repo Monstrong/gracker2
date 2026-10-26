@@ -3,31 +3,32 @@ package db
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/monstrong/gracker2/pkg/config"
 )
 
+const defaultTimeout = 5*time.Second
+
 func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
-	connStr := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s pool_max_conns=%d",
-		cfg.Host,
-		cfg.Port,
-		cfg.User,
-		cfg.Password,
-		cfg.DBName,
-		cfg.SSLMode,
-		cfg.MaxConns,
-	)
-	
-	pool, err := pgxpool.New(context.Background(), connStr)
+	dsn := BuildDSN(cfg)
+
+	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("error making pool: %w", err)
+		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating pool: %w", err)
+	}
 
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
@@ -35,4 +36,17 @@ func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+func BuildDSN(cfg *config.Postgres) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
