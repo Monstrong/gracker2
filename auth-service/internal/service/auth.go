@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
 	"github.com/monstrong/gracker2/pkg/errs"
 )
 
@@ -24,6 +25,9 @@ func (s *UserService) Login(ctx context.Context, email, password string) (access
 			return "", "", fmt.Errorf("%s: %w", op, errs.ErrInvalidCredentials) // не раскрываем
 		}
 		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+	if u.Role == models.BannedRole {
+		return "", "", fmt.Errorf("%s: %w", op, errs.BannedUser)
 	}
 
 	if err = s.h.CheckPassword(password, u.PasswordHash); err != nil {
@@ -59,6 +63,14 @@ func (s *UserService) Logout(ctx context.Context, rawRefresh string) (bool, erro
     return true, nil
 }
 
+func (s *UserService) LogoutEverywhere(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "service.User.LogoutEverywhere"
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return true, nil
+}
+
 func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, newRefresh string, err error) {
     const op = "service.User.Refresh"
 
@@ -78,7 +90,7 @@ func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, n
 		if errors.Is(err, errs.ErrNotFound) {
 			return "", "", fmt.Errorf("%s: %w", op, errs.ErrInvalidCredentials) // → 401
 		}
-        return "", "", fmt.Errorf("%s: %w", op, err) // ErrNotFound → 401
+        return "", "", fmt.Errorf("%s: %w", op, err)
     }
 
     userID, err := uuid.Parse(userIDStr)
@@ -90,6 +102,11 @@ func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, n
     if err != nil {
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
+
+	if u.Role == models.BannedRole {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
+		return "", "", fmt.Errorf("%s: %w", op, errs.BannedUser)
+	}
 
     access, err = s.m.NewToken(u.ID, u.Role, u.Premium)
     if err != nil {

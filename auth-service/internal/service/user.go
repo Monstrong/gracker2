@@ -42,6 +42,64 @@ func (s *UserService) Register(ctx context.Context, name, email, password string
 
 }
 
+func (s *UserService) BanUser(ctx context.Context, id uuid.UUID, SenderRole models.Role) (bool, error) {
+	const op = "service.User.BanUser"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if SenderRole.Weight() < models.AdminRole.Weight() {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+	currentRole, err := s.urepo.GetRole(ctx, id) // get target user role
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if currentRole > models.ModeratorRole {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+	updated, err := s.urepo.BanUser(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return true, fmt.Errorf("%s: %w", op, err)
+	}
+	return updated, nil
+}
+
+func (s *UserService) UnbanUser(ctx context.Context, id uuid.UUID, SenderRole models.Role) (bool, error) {
+	const op = "service.User.UnbanUser"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if SenderRole.Weight() < models.AdminRole.Weight() {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+	currentRole, err := s.urepo.GetRole(ctx, id) // get target user role
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if currentRole != models.BannedRole {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+
+	updated, err := s.urepo.UnbanUser(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	return updated, nil
+}
+
+// GetUser returns user PUBLIC PROFILE
 func (s *UserService) GetUser(ctx context.Context, id uuid.UUID) (*models.UserPublic, error) {
 	const op = "service.User.GetUserPublic"
 	if err := validateID(id); err != nil {
@@ -54,6 +112,7 @@ func (s *UserService) GetUser(ctx context.Context, id uuid.UUID) (*models.UserPu
 	return u, nil
 }
 
+// GetMe returns user PRIVATE PROFILE
 func (s *UserService) GetMe(ctx context.Context, targetID uuid.UUID, myID uuid.UUID) (*models.UserPrivate, error) {
 	const op = "service.User.GetUserPrivate"
 	if err := validateID(targetID); err != nil {
@@ -70,6 +129,8 @@ func (s *UserService) GetMe(ctx context.Context, targetID uuid.UUID, myID uuid.U
 	return u, nil
 }
 
+
+// AdminGetUser returns user PRIVATE PROFILE
 func (s *UserService) AdminGetUser(ctx context.Context, id uuid.UUID, role models.Role) (*models.UserPrivate, error) {
 	const op = "service.User.AdminGetUser"
 	if err := validateID(id); err != nil {
@@ -96,6 +157,9 @@ func (s *UserService) RoleUpdate(ctx context.Context, id uuid.UUID, TargetRole m
 		SenderRole == models.BillingRole {
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	}
+	if TargetRole == models.BannedRole {
+		return false, fmt.Errorf("%s: %w", op, errs.WrongMethod)
+	}
 
 	currentRole, err := s.urepo.GetRole(ctx, id) // get target user role
 	if err != nil {
@@ -106,9 +170,11 @@ func (s *UserService) RoleUpdate(ctx context.Context, id uuid.UUID, TargetRole m
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	case models.RoleUnspecified:
 		return false, fmt.Errorf("%s: %w", op, errs.ErrInternal)
+	case models.BannedRole:
+		return false, fmt.Errorf("%s: %w", op, errs.WrongMethod)
 	}
 
-	if SenderRole.Weight() <= currentRole.Weight() || SenderRole.Weight() <= TargetRole.Weight() {
+	if SenderRole.Weight() <= currentRole.Weight() || SenderRole.Weight() <= TargetRole.Weight() { // тут исключается вариант самоповышения (senderRole == currentrole)
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	}
 
@@ -171,6 +237,9 @@ func (s *UserService) DeleteUser(ctx context.Context, id uuid.UUID, senderRole m
 	if !deleted {
 		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
 	}
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
 	return true, nil
 }
 
@@ -223,6 +292,9 @@ func (s *UserService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassw
 	}
 	if !updated {
 		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return true, nil
