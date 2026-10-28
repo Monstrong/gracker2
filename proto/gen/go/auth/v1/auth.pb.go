@@ -1944,9 +1944,9 @@ const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\x13PREMIUM_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fPREMIUM_FREE\x10\x01\x12\x13\n" +
 	"\x0fPREMIUM_PREMIUM\x10\x022\x95\b\n" +
-	"\vAuthService\x126\n" +
-	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\x12?\n" +
-	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x19.auth.v1.RegisterResponse\x12<\n" +
+	"\vAuthService\x12?\n" +
+	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x19.auth.v1.RegisterResponse\x126\n" +
+	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\x12<\n" +
 	"\aRefresh\x12\x17.auth.v1.RefreshRequest\x1a\x18.auth.v1.RefreshResponse\x129\n" +
 	"\x06Logout\x12\x16.auth.v1.LogoutRequest\x1a\x17.auth.v1.LogoutResponse\x12W\n" +
 	"\x10LogoutEverywhere\x12 .auth.v1.LogoutEverywhereRequest\x1a!.auth.v1.LogoutEverywhereResponse\x12E\n" +
@@ -2034,8 +2034,8 @@ var file_proto_auth_v1_auth_proto_depIdxs = []int32{
 	1,  // 13: auth.v1.User.premium:type_name -> auth.v1.Premium
 	36, // 14: auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
 	36, // 15: auth.v1.User.updated_at:type_name -> google.protobuf.Timestamp
-	2,  // 16: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
-	4,  // 17: auth.v1.AuthService.Register:input_type -> auth.v1.RegisterRequest
+	4,  // 16: auth.v1.AuthService.Register:input_type -> auth.v1.RegisterRequest
+	2,  // 17: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
 	6,  // 18: auth.v1.AuthService.Refresh:input_type -> auth.v1.RefreshRequest
 	26, // 19: auth.v1.AuthService.Logout:input_type -> auth.v1.LogoutRequest
 	28, // 20: auth.v1.AuthService.LogoutEverywhere:input_type -> auth.v1.LogoutEverywhereRequest
@@ -2049,8 +2049,8 @@ var file_proto_auth_v1_auth_proto_depIdxs = []int32{
 	30, // 28: auth.v1.AuthService.BanUser:input_type -> auth.v1.BanUserRequest
 	32, // 29: auth.v1.AuthService.UnBanUser:input_type -> auth.v1.UnBanUserRequest
 	24, // 30: auth.v1.AuthService.ChangePassword:input_type -> auth.v1.ChangePasswordRequest
-	3,  // 31: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
-	5,  // 32: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
+	5,  // 31: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
+	3,  // 32: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
 	7,  // 33: auth.v1.AuthService.Refresh:output_type -> auth.v1.RefreshResponse
 	27, // 34: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
 	29, // 35: auth.v1.AuthService.LogoutEverywhere:output_type -> auth.v1.LogoutEverywhereResponse
