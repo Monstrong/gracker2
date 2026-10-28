@@ -19,20 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Login_FullMethodName          = "/auth.v1.AuthService/Login"
-	AuthService_Register_FullMethodName       = "/auth.v1.AuthService/Register"
-	AuthService_Refresh_FullMethodName        = "/auth.v1.AuthService/Refresh"
-	AuthService_Logout_FullMethodName         = "/auth.v1.AuthService/Logout"
-	AuthService_RoleUpdate_FullMethodName     = "/auth.v1.AuthService/RoleUpdate"
-	AuthService_PremiumUpdate_FullMethodName  = "/auth.v1.AuthService/PremiumUpdate"
-	AuthService_GetMe_FullMethodName          = "/auth.v1.AuthService/GetMe"
-	AuthService_GetUser_FullMethodName        = "/auth.v1.AuthService/GetUser"
-	AuthService_AdminGetUser_FullMethodName   = "/auth.v1.AuthService/AdminGetUser"
-	AuthService_UpdateUser_FullMethodName     = "/auth.v1.AuthService/UpdateUser"
-	AuthService_DeleteUser_FullMethodName     = "/auth.v1.AuthService/DeleteUser"
-	AuthService_BanUser_FullMethodName        = "/auth.v1.AuthService/BanUser"
-	AuthService_UnBanUser_FullMethodName      = "/auth.v1.AuthService/UnBanUser"
-	AuthService_ChangePassword_FullMethodName = "/auth.v1.AuthService/ChangePassword"
+	AuthService_Login_FullMethodName            = "/auth.v1.AuthService/Login"
+	AuthService_Register_FullMethodName         = "/auth.v1.AuthService/Register"
+	AuthService_Refresh_FullMethodName          = "/auth.v1.AuthService/Refresh"
+	AuthService_Logout_FullMethodName           = "/auth.v1.AuthService/Logout"
+	AuthService_LogoutEverywhere_FullMethodName = "/auth.v1.AuthService/LogoutEverywhere"
+	AuthService_RoleUpdate_FullMethodName       = "/auth.v1.AuthService/RoleUpdate"
+	AuthService_PremiumUpdate_FullMethodName    = "/auth.v1.AuthService/PremiumUpdate"
+	AuthService_GetMe_FullMethodName            = "/auth.v1.AuthService/GetMe"
+	AuthService_GetUser_FullMethodName          = "/auth.v1.AuthService/GetUser"
+	AuthService_AdminGetUser_FullMethodName     = "/auth.v1.AuthService/AdminGetUser"
+	AuthService_UpdateUser_FullMethodName       = "/auth.v1.AuthService/UpdateUser"
+	AuthService_DeleteUser_FullMethodName       = "/auth.v1.AuthService/DeleteUser"
+	AuthService_BanUser_FullMethodName          = "/auth.v1.AuthService/BanUser"
+	AuthService_UnBanUser_FullMethodName        = "/auth.v1.AuthService/UnBanUser"
+	AuthService_ChangePassword_FullMethodName   = "/auth.v1.AuthService/ChangePassword"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -43,6 +44,7 @@ type AuthServiceClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
 	Refresh(ctx context.Context, in *RefreshRequest, opts ...grpc.CallOption) (*RefreshResponse, error)
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
+	LogoutEverywhere(ctx context.Context, in *LogoutEverywhereRequest, opts ...grpc.CallOption) (*LogoutEverywhereResponse, error)
 	RoleUpdate(ctx context.Context, in *RoleUpdateRequest, opts ...grpc.CallOption) (*RoleUpdateResponse, error)
 	PremiumUpdate(ctx context.Context, in *PremiumUpdateRequest, opts ...grpc.CallOption) (*PremiumUpdateResponse, error)
 	GetMe(ctx context.Context, in *GetMeRequest, opts ...grpc.CallOption) (*GetMeResponse, error)
@@ -97,6 +99,16 @@ func (c *authServiceClient) Logout(ctx context.Context, in *LogoutRequest, opts 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LogoutResponse)
 	err := c.cc.Invoke(ctx, AuthService_Logout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) LogoutEverywhere(ctx context.Context, in *LogoutEverywhereRequest, opts ...grpc.CallOption) (*LogoutEverywhereResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LogoutEverywhereResponse)
+	err := c.cc.Invoke(ctx, AuthService_LogoutEverywhere_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +223,7 @@ type AuthServiceServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 	Refresh(context.Context, *RefreshRequest) (*RefreshResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
+	LogoutEverywhere(context.Context, *LogoutEverywhereRequest) (*LogoutEverywhereResponse, error)
 	RoleUpdate(context.Context, *RoleUpdateRequest) (*RoleUpdateResponse, error)
 	PremiumUpdate(context.Context, *PremiumUpdateRequest) (*PremiumUpdateResponse, error)
 	GetMe(context.Context, *GetMeRequest) (*GetMeResponse, error)
@@ -242,6 +255,9 @@ func (UnimplementedAuthServiceServer) Refresh(context.Context, *RefreshRequest) 
 }
 func (UnimplementedAuthServiceServer) Logout(context.Context, *LogoutRequest) (*LogoutResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Logout not implemented")
+}
+func (UnimplementedAuthServiceServer) LogoutEverywhere(context.Context, *LogoutEverywhereRequest) (*LogoutEverywhereResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LogoutEverywhere not implemented")
 }
 func (UnimplementedAuthServiceServer) RoleUpdate(context.Context, *RoleUpdateRequest) (*RoleUpdateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RoleUpdate not implemented")
@@ -362,6 +378,24 @@ func _AuthService_Logout_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthServiceServer).Logout(ctx, req.(*LogoutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_LogoutEverywhere_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LogoutEverywhereRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).LogoutEverywhere(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_LogoutEverywhere_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).LogoutEverywhere(ctx, req.(*LogoutEverywhereRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -568,6 +602,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Logout",
 			Handler:    _AuthService_Logout_Handler,
+		},
+		{
+			MethodName: "LogoutEverywhere",
+			Handler:    _AuthService_LogoutEverywhere_Handler,
 		},
 		{
 			MethodName: "RoleUpdate",

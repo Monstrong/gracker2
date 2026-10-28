@@ -1356,6 +1356,78 @@ func (*LogoutResponse) Descriptor() ([]byte, []int) {
 	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{25}
 }
 
+type LogoutEverywhereRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutEverywhereRequest) Reset() {
+	*x = LogoutEverywhereRequest{}
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutEverywhereRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutEverywhereRequest) ProtoMessage() {}
+
+func (x *LogoutEverywhereRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutEverywhereRequest.ProtoReflect.Descriptor instead.
+func (*LogoutEverywhereRequest) Descriptor() ([]byte, []int) {
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{26}
+}
+
+type LogoutEverywhereResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutEverywhereResponse) Reset() {
+	*x = LogoutEverywhereResponse{}
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutEverywhereResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutEverywhereResponse) ProtoMessage() {}
+
+func (x *LogoutEverywhereResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutEverywhereResponse.ProtoReflect.Descriptor instead.
+func (*LogoutEverywhereResponse) Descriptor() ([]byte, []int) {
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{27}
+}
+
 type BanUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1365,7 +1437,7 @@ type BanUserRequest struct {
 
 func (x *BanUserRequest) Reset() {
 	*x = BanUserRequest{}
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[26]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1377,7 +1449,7 @@ func (x *BanUserRequest) String() string {
 func (*BanUserRequest) ProtoMessage() {}
 
 func (x *BanUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[26]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1390,7 +1462,7 @@ func (x *BanUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BanUserRequest.ProtoReflect.Descriptor instead.
 func (*BanUserRequest) Descriptor() ([]byte, []int) {
-	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{26}
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *BanUserRequest) GetId() string {
@@ -1409,7 +1481,7 @@ type BanUserResponse struct {
 
 func (x *BanUserResponse) Reset() {
 	*x = BanUserResponse{}
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[27]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1493,7 @@ func (x *BanUserResponse) String() string {
 func (*BanUserResponse) ProtoMessage() {}
 
 func (x *BanUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[27]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1506,7 @@ func (x *BanUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BanUserResponse.ProtoReflect.Descriptor instead.
 func (*BanUserResponse) Descriptor() ([]byte, []int) {
-	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{27}
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *BanUserResponse) GetBanned() bool {
@@ -1453,7 +1525,7 @@ type UnBanUserRequest struct {
 
 func (x *UnBanUserRequest) Reset() {
 	*x = UnBanUserRequest{}
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[28]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1465,7 +1537,7 @@ func (x *UnBanUserRequest) String() string {
 func (*UnBanUserRequest) ProtoMessage() {}
 
 func (x *UnBanUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[28]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1478,7 +1550,7 @@ func (x *UnBanUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnBanUserRequest.ProtoReflect.Descriptor instead.
 func (*UnBanUserRequest) Descriptor() ([]byte, []int) {
-	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{28}
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UnBanUserRequest) GetId() string {
@@ -1497,7 +1569,7 @@ type UnBanUserResponse struct {
 
 func (x *UnBanUserResponse) Reset() {
 	*x = UnBanUserResponse{}
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[29]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1509,7 +1581,7 @@ func (x *UnBanUserResponse) String() string {
 func (*UnBanUserResponse) ProtoMessage() {}
 
 func (x *UnBanUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[29]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1522,7 +1594,7 @@ func (x *UnBanUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnBanUserResponse.ProtoReflect.Descriptor instead.
 func (*UnBanUserResponse) Descriptor() ([]byte, []int) {
-	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{29}
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UnBanUserResponse) GetUnbanned() bool {
@@ -1548,7 +1620,7 @@ type PublicUser struct {
 
 func (x *PublicUser) Reset() {
 	*x = PublicUser{}
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[30]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1560,7 +1632,7 @@ func (x *PublicUser) String() string {
 func (*PublicUser) ProtoMessage() {}
 
 func (x *PublicUser) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[30]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1573,7 +1645,7 @@ func (x *PublicUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicUser.ProtoReflect.Descriptor instead.
 func (*PublicUser) Descriptor() ([]byte, []int) {
-	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{30}
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *PublicUser) GetId() string {
@@ -1649,7 +1721,7 @@ type User struct {
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[31]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1661,7 +1733,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_auth_v1_auth_proto_msgTypes[31]
+	mi := &file_proto_auth_v1_auth_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1674,7 +1746,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{31}
+	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *User) GetId() string {
@@ -1812,7 +1884,9 @@ const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\x16ChangePasswordResponse\x12\x18\n" +
 	"\aupdated\x18\x01 \x01(\bR\aupdated\"\x0f\n" +
 	"\rLogoutRequest\"\x10\n" +
-	"\x0eLogoutResponse\" \n" +
+	"\x0eLogoutResponse\"\x19\n" +
+	"\x17LogoutEverywhereRequest\"\x1a\n" +
+	"\x18LogoutEverywhereResponse\" \n" +
 	"\x0eBanUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\")\n" +
 	"\x0fBanUserResponse\x12\x16\n" +
@@ -1860,12 +1934,13 @@ const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\aPremium\x12\x17\n" +
 	"\x13PREMIUM_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fPREMIUM_FREE\x10\x01\x12\x13\n" +
-	"\x0fPREMIUM_PREMIUM\x10\x022\xbc\a\n" +
+	"\x0fPREMIUM_PREMIUM\x10\x022\x95\b\n" +
 	"\vAuthService\x126\n" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\x12?\n" +
 	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x19.auth.v1.RegisterResponse\x12<\n" +
 	"\aRefresh\x12\x17.auth.v1.RefreshRequest\x1a\x18.auth.v1.RefreshResponse\x129\n" +
-	"\x06Logout\x12\x16.auth.v1.LogoutRequest\x1a\x17.auth.v1.LogoutResponse\x12E\n" +
+	"\x06Logout\x12\x16.auth.v1.LogoutRequest\x1a\x17.auth.v1.LogoutResponse\x12W\n" +
+	"\x10LogoutEverywhere\x12 .auth.v1.LogoutEverywhereRequest\x1a!.auth.v1.LogoutEverywhereResponse\x12E\n" +
 	"\n" +
 	"RoleUpdate\x12\x1a.auth.v1.RoleUpdateRequest\x1a\x1b.auth.v1.RoleUpdateResponse\x12N\n" +
 	"\rPremiumUpdate\x12\x1d.auth.v1.PremiumUpdateRequest\x1a\x1e.auth.v1.PremiumUpdateResponse\x126\n" +
@@ -1893,91 +1968,95 @@ func file_proto_auth_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_auth_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_proto_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_proto_auth_v1_auth_proto_goTypes = []any{
-	(Role)(0),                      // 0: auth.v1.Role
-	(Premium)(0),                   // 1: auth.v1.Premium
-	(*LoginRequest)(nil),           // 2: auth.v1.LoginRequest
-	(*LoginResponse)(nil),          // 3: auth.v1.LoginResponse
-	(*RegisterRequest)(nil),        // 4: auth.v1.RegisterRequest
-	(*RegisterResponse)(nil),       // 5: auth.v1.RegisterResponse
-	(*RefreshRequest)(nil),         // 6: auth.v1.RefreshRequest
-	(*RefreshResponse)(nil),        // 7: auth.v1.RefreshResponse
-	(*ValidateRequest)(nil),        // 8: auth.v1.ValidateRequest
-	(*ValidateResponse)(nil),       // 9: auth.v1.ValidateResponse
-	(*RoleUpdateRequest)(nil),      // 10: auth.v1.RoleUpdateRequest
-	(*PremiumUpdateResponse)(nil),  // 11: auth.v1.PremiumUpdateResponse
-	(*PremiumUpdateRequest)(nil),   // 12: auth.v1.PremiumUpdateRequest
-	(*RoleUpdateResponse)(nil),     // 13: auth.v1.RoleUpdateResponse
-	(*GetMeRequest)(nil),           // 14: auth.v1.GetMeRequest
-	(*GetMeResponse)(nil),          // 15: auth.v1.GetMeResponse
-	(*GetUserRequest)(nil),         // 16: auth.v1.GetUserRequest
-	(*GetUserResponse)(nil),        // 17: auth.v1.GetUserResponse
-	(*DeleteUserRequest)(nil),      // 18: auth.v1.DeleteUserRequest
-	(*DeleteUserResponse)(nil),     // 19: auth.v1.DeleteUserResponse
-	(*AdminGetUserRequest)(nil),    // 20: auth.v1.AdminGetUserRequest
-	(*AdminGetUserResponse)(nil),   // 21: auth.v1.AdminGetUserResponse
-	(*UpdateUserRequest)(nil),      // 22: auth.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),     // 23: auth.v1.UpdateUserResponse
-	(*ChangePasswordRequest)(nil),  // 24: auth.v1.ChangePasswordRequest
-	(*ChangePasswordResponse)(nil), // 25: auth.v1.ChangePasswordResponse
-	(*LogoutRequest)(nil),          // 26: auth.v1.LogoutRequest
-	(*LogoutResponse)(nil),         // 27: auth.v1.LogoutResponse
-	(*BanUserRequest)(nil),         // 28: auth.v1.BanUserRequest
-	(*BanUserResponse)(nil),        // 29: auth.v1.BanUserResponse
-	(*UnBanUserRequest)(nil),       // 30: auth.v1.UnBanUserRequest
-	(*UnBanUserResponse)(nil),      // 31: auth.v1.UnBanUserResponse
-	(*PublicUser)(nil),             // 32: auth.v1.PublicUser
-	(*User)(nil),                   // 33: auth.v1.User
-	(*timestamppb.Timestamp)(nil),  // 34: google.protobuf.Timestamp
+	(Role)(0),                        // 0: auth.v1.Role
+	(Premium)(0),                     // 1: auth.v1.Premium
+	(*LoginRequest)(nil),             // 2: auth.v1.LoginRequest
+	(*LoginResponse)(nil),            // 3: auth.v1.LoginResponse
+	(*RegisterRequest)(nil),          // 4: auth.v1.RegisterRequest
+	(*RegisterResponse)(nil),         // 5: auth.v1.RegisterResponse
+	(*RefreshRequest)(nil),           // 6: auth.v1.RefreshRequest
+	(*RefreshResponse)(nil),          // 7: auth.v1.RefreshResponse
+	(*ValidateRequest)(nil),          // 8: auth.v1.ValidateRequest
+	(*ValidateResponse)(nil),         // 9: auth.v1.ValidateResponse
+	(*RoleUpdateRequest)(nil),        // 10: auth.v1.RoleUpdateRequest
+	(*PremiumUpdateResponse)(nil),    // 11: auth.v1.PremiumUpdateResponse
+	(*PremiumUpdateRequest)(nil),     // 12: auth.v1.PremiumUpdateRequest
+	(*RoleUpdateResponse)(nil),       // 13: auth.v1.RoleUpdateResponse
+	(*GetMeRequest)(nil),             // 14: auth.v1.GetMeRequest
+	(*GetMeResponse)(nil),            // 15: auth.v1.GetMeResponse
+	(*GetUserRequest)(nil),           // 16: auth.v1.GetUserRequest
+	(*GetUserResponse)(nil),          // 17: auth.v1.GetUserResponse
+	(*DeleteUserRequest)(nil),        // 18: auth.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),       // 19: auth.v1.DeleteUserResponse
+	(*AdminGetUserRequest)(nil),      // 20: auth.v1.AdminGetUserRequest
+	(*AdminGetUserResponse)(nil),     // 21: auth.v1.AdminGetUserResponse
+	(*UpdateUserRequest)(nil),        // 22: auth.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),       // 23: auth.v1.UpdateUserResponse
+	(*ChangePasswordRequest)(nil),    // 24: auth.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),   // 25: auth.v1.ChangePasswordResponse
+	(*LogoutRequest)(nil),            // 26: auth.v1.LogoutRequest
+	(*LogoutResponse)(nil),           // 27: auth.v1.LogoutResponse
+	(*LogoutEverywhereRequest)(nil),  // 28: auth.v1.LogoutEverywhereRequest
+	(*LogoutEverywhereResponse)(nil), // 29: auth.v1.LogoutEverywhereResponse
+	(*BanUserRequest)(nil),           // 30: auth.v1.BanUserRequest
+	(*BanUserResponse)(nil),          // 31: auth.v1.BanUserResponse
+	(*UnBanUserRequest)(nil),         // 32: auth.v1.UnBanUserRequest
+	(*UnBanUserResponse)(nil),        // 33: auth.v1.UnBanUserResponse
+	(*PublicUser)(nil),               // 34: auth.v1.PublicUser
+	(*User)(nil),                     // 35: auth.v1.User
+	(*timestamppb.Timestamp)(nil),    // 36: google.protobuf.Timestamp
 }
 var file_proto_auth_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: auth.v1.ValidateResponse.role:type_name -> auth.v1.Role
 	1,  // 1: auth.v1.ValidateResponse.premium:type_name -> auth.v1.Premium
 	0,  // 2: auth.v1.RoleUpdateRequest.new_role:type_name -> auth.v1.Role
 	1,  // 3: auth.v1.PremiumUpdateRequest.new_premium:type_name -> auth.v1.Premium
-	33, // 4: auth.v1.GetMeResponse.user:type_name -> auth.v1.User
-	32, // 5: auth.v1.GetUserResponse.user:type_name -> auth.v1.PublicUser
-	33, // 6: auth.v1.AdminGetUserResponse.user:type_name -> auth.v1.User
-	33, // 7: auth.v1.UpdateUserResponse.user:type_name -> auth.v1.User
+	35, // 4: auth.v1.GetMeResponse.user:type_name -> auth.v1.User
+	34, // 5: auth.v1.GetUserResponse.user:type_name -> auth.v1.PublicUser
+	35, // 6: auth.v1.AdminGetUserResponse.user:type_name -> auth.v1.User
+	35, // 7: auth.v1.UpdateUserResponse.user:type_name -> auth.v1.User
 	0,  // 8: auth.v1.PublicUser.role:type_name -> auth.v1.Role
 	1,  // 9: auth.v1.PublicUser.premium:type_name -> auth.v1.Premium
-	34, // 10: auth.v1.PublicUser.created_at:type_name -> google.protobuf.Timestamp
-	34, // 11: auth.v1.PublicUser.updated_at:type_name -> google.protobuf.Timestamp
+	36, // 10: auth.v1.PublicUser.created_at:type_name -> google.protobuf.Timestamp
+	36, // 11: auth.v1.PublicUser.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 12: auth.v1.User.role:type_name -> auth.v1.Role
 	1,  // 13: auth.v1.User.premium:type_name -> auth.v1.Premium
-	34, // 14: auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	34, // 15: auth.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	36, // 14: auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	36, // 15: auth.v1.User.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 16: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
 	4,  // 17: auth.v1.AuthService.Register:input_type -> auth.v1.RegisterRequest
 	6,  // 18: auth.v1.AuthService.Refresh:input_type -> auth.v1.RefreshRequest
 	26, // 19: auth.v1.AuthService.Logout:input_type -> auth.v1.LogoutRequest
-	10, // 20: auth.v1.AuthService.RoleUpdate:input_type -> auth.v1.RoleUpdateRequest
-	12, // 21: auth.v1.AuthService.PremiumUpdate:input_type -> auth.v1.PremiumUpdateRequest
-	14, // 22: auth.v1.AuthService.GetMe:input_type -> auth.v1.GetMeRequest
-	16, // 23: auth.v1.AuthService.GetUser:input_type -> auth.v1.GetUserRequest
-	20, // 24: auth.v1.AuthService.AdminGetUser:input_type -> auth.v1.AdminGetUserRequest
-	22, // 25: auth.v1.AuthService.UpdateUser:input_type -> auth.v1.UpdateUserRequest
-	18, // 26: auth.v1.AuthService.DeleteUser:input_type -> auth.v1.DeleteUserRequest
-	28, // 27: auth.v1.AuthService.BanUser:input_type -> auth.v1.BanUserRequest
-	30, // 28: auth.v1.AuthService.UnBanUser:input_type -> auth.v1.UnBanUserRequest
-	24, // 29: auth.v1.AuthService.ChangePassword:input_type -> auth.v1.ChangePasswordRequest
-	3,  // 30: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
-	5,  // 31: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
-	7,  // 32: auth.v1.AuthService.Refresh:output_type -> auth.v1.RefreshResponse
-	27, // 33: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
-	13, // 34: auth.v1.AuthService.RoleUpdate:output_type -> auth.v1.RoleUpdateResponse
-	11, // 35: auth.v1.AuthService.PremiumUpdate:output_type -> auth.v1.PremiumUpdateResponse
-	15, // 36: auth.v1.AuthService.GetMe:output_type -> auth.v1.GetMeResponse
-	17, // 37: auth.v1.AuthService.GetUser:output_type -> auth.v1.GetUserResponse
-	21, // 38: auth.v1.AuthService.AdminGetUser:output_type -> auth.v1.AdminGetUserResponse
-	23, // 39: auth.v1.AuthService.UpdateUser:output_type -> auth.v1.UpdateUserResponse
-	19, // 40: auth.v1.AuthService.DeleteUser:output_type -> auth.v1.DeleteUserResponse
-	29, // 41: auth.v1.AuthService.BanUser:output_type -> auth.v1.BanUserResponse
-	31, // 42: auth.v1.AuthService.UnBanUser:output_type -> auth.v1.UnBanUserResponse
-	25, // 43: auth.v1.AuthService.ChangePassword:output_type -> auth.v1.ChangePasswordResponse
-	30, // [30:44] is the sub-list for method output_type
-	16, // [16:30] is the sub-list for method input_type
+	28, // 20: auth.v1.AuthService.LogoutEverywhere:input_type -> auth.v1.LogoutEverywhereRequest
+	10, // 21: auth.v1.AuthService.RoleUpdate:input_type -> auth.v1.RoleUpdateRequest
+	12, // 22: auth.v1.AuthService.PremiumUpdate:input_type -> auth.v1.PremiumUpdateRequest
+	14, // 23: auth.v1.AuthService.GetMe:input_type -> auth.v1.GetMeRequest
+	16, // 24: auth.v1.AuthService.GetUser:input_type -> auth.v1.GetUserRequest
+	20, // 25: auth.v1.AuthService.AdminGetUser:input_type -> auth.v1.AdminGetUserRequest
+	22, // 26: auth.v1.AuthService.UpdateUser:input_type -> auth.v1.UpdateUserRequest
+	18, // 27: auth.v1.AuthService.DeleteUser:input_type -> auth.v1.DeleteUserRequest
+	30, // 28: auth.v1.AuthService.BanUser:input_type -> auth.v1.BanUserRequest
+	32, // 29: auth.v1.AuthService.UnBanUser:input_type -> auth.v1.UnBanUserRequest
+	24, // 30: auth.v1.AuthService.ChangePassword:input_type -> auth.v1.ChangePasswordRequest
+	3,  // 31: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
+	5,  // 32: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
+	7,  // 33: auth.v1.AuthService.Refresh:output_type -> auth.v1.RefreshResponse
+	27, // 34: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
+	29, // 35: auth.v1.AuthService.LogoutEverywhere:output_type -> auth.v1.LogoutEverywhereResponse
+	13, // 36: auth.v1.AuthService.RoleUpdate:output_type -> auth.v1.RoleUpdateResponse
+	11, // 37: auth.v1.AuthService.PremiumUpdate:output_type -> auth.v1.PremiumUpdateResponse
+	15, // 38: auth.v1.AuthService.GetMe:output_type -> auth.v1.GetMeResponse
+	17, // 39: auth.v1.AuthService.GetUser:output_type -> auth.v1.GetUserResponse
+	21, // 40: auth.v1.AuthService.AdminGetUser:output_type -> auth.v1.AdminGetUserResponse
+	23, // 41: auth.v1.AuthService.UpdateUser:output_type -> auth.v1.UpdateUserResponse
+	19, // 42: auth.v1.AuthService.DeleteUser:output_type -> auth.v1.DeleteUserResponse
+	31, // 43: auth.v1.AuthService.BanUser:output_type -> auth.v1.BanUserResponse
+	33, // 44: auth.v1.AuthService.UnBanUser:output_type -> auth.v1.UnBanUserResponse
+	25, // 45: auth.v1.AuthService.ChangePassword:output_type -> auth.v1.ChangePasswordResponse
+	31, // [31:46] is the sub-list for method output_type
+	16, // [16:31] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
 	16, // [16:16] is the sub-list for extension extendee
 	0,  // [0:16] is the sub-list for field type_name
@@ -1995,7 +2074,7 @@ func file_proto_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_auth_v1_auth_proto_rawDesc), len(file_proto_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   32,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
