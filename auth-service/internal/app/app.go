@@ -12,6 +12,9 @@ import (
 	"github.com/monstrong/gracker2/auth-service/internal/repository"
 	"github.com/monstrong/gracker2/auth-service/internal/service"
 	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
+	"github.com/monstrong/gracker2/auth-service/pkg/hasher"
+	"github.com/monstrong/gracker2/auth-service/pkg/jwtmanager"
+	"github.com/monstrong/gracker2/auth-service/pkg/redisclient"
 	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
@@ -47,8 +50,18 @@ func New(ctx context.Context) (*App, error) {
 	}
 	l.Info(ctx, "db pool init complete")
 
-	repo := repository.NewPostgresRepository(pool)
-	svc := service.NewAuthService(repo)
+	rclient, err := redisclient.NewClient(ctx, &cfg.Redis)
+	if err != nil {
+		return nil, fmt.Errorf("create redis client: %w", err)
+	}
+	l.Info(ctx, "redis client init complete")
+
+	urepo := repository.NewPostgresRepository(pool)
+	rfrepo := repository.NewRedisRepository(rclient)
+	m := jwtmanager.NewManager(cfg.JWT.SigningKey, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL)
+	h := hasher.NewSimpleHasher(cfg.Hasher.Cost)
+	
+	svc := service.New(m, h, urepo, rfrepo)
 	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(

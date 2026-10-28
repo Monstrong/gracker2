@@ -88,7 +88,6 @@ func toGRPCError(err error) error {
 	if errors.As(err, &ve) {
 		return status.Error(codes.InvalidArgument, ve.Reason)
 	}
-
 	if errors.Is(err, context.DeadlineExceeded) {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}

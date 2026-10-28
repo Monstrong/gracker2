@@ -17,6 +17,11 @@ const refreshPrefix = "refresh:"
 type RedisRepository struct {
 	c redis.UniversalClient
 }
+func NewRedisRepository(c redis.UniversalClient) *RedisRepository {
+	return &RedisRepository{
+		c: c,
+	}
+}
 // redis выглядит так:
 // refresh:hash_A             → "123"
 // refresh:hash_B             → "123"

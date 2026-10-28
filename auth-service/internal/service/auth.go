@@ -95,11 +95,13 @@ func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, n
 
     userID, err := uuid.Parse(userIDStr)
     if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
 
     u, err := s.urepo.GetUserPrivate(ctx, userID) // актуальные role/premium
     if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
 
@@ -110,6 +112,7 @@ func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, n
 
     access, err = s.m.NewToken(u.ID, u.Role, u.Premium)
     if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
 

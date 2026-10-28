@@ -1286,6 +1286,7 @@ func (x *ChangePasswordResponse) GetUpdated() bool {
 
 type LogoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1318,6 +1319,13 @@ func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
 func (*LogoutRequest) Descriptor() ([]byte, []int) {
 	return file_proto_auth_v1_auth_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *LogoutRequest) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
 }
 
 type LogoutResponse struct {
@@ -1882,8 +1890,9 @@ const file_proto_auth_v1_auth_proto_rawDesc = "" +
 	"\fold_password\x18\x01 \x01(\tR\voldPassword\x12!\n" +
 	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\"2\n" +
 	"\x16ChangePasswordResponse\x12\x18\n" +
-	"\aupdated\x18\x01 \x01(\bR\aupdated\"\x0f\n" +
-	"\rLogoutRequest\"\x10\n" +
+	"\aupdated\x18\x01 \x01(\bR\aupdated\"4\n" +
+	"\rLogoutRequest\x12#\n" +
+	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"\x10\n" +
 	"\x0eLogoutResponse\"\x19\n" +
 	"\x17LogoutEverywhereRequest\"\x1a\n" +
 	"\x18LogoutEverywhereResponse\" \n" +

@@ -1,0 +1,4037 @@
+=== FILE: ./api-gateway/cmd/server/main.go ===
+package main=== FILE: ./api-gateway/TODO.md ===
+1. Middleware: jwt.Parse (проверка exp встроена)=== FILE: ./api-gateway/go.mod ===
+module github.com/monstrong/gracker2/api-gateway
+
+go 1.26.2
+=== FILE: ./README.md ===
+=== FILE: ./pkg/domain/models.go ===
+package domain
+
+type Role int8
+
+const (
+	RoleUnspecified Role = iota
+	BannedRole
+	UserRole
+	ModeratorRole
+	AdminRole
+	OwnerRole // admin who can ban admins
+
+	BillingRole
+)
+
+func (r Role) Weight() int {
+    switch r {
+	case BannedRole:    return 0 
+    case UserRole:      return 1
+    case ModeratorRole: return 2
+    case AdminRole:     return 3
+    case OwnerRole:     return 4
+    
+	case BillingRole:   return 100
+    default:            return -1 // unspecified / неизвестное
+    }
+}
+
+type PremiumType int8
+
+const (
+	PremiumUnspecified PremiumType = iota
+	Free
+	Premium
+)
+=== FILE: ./pkg/db/postgres.go ===
+package db
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/url"
+	"strconv"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/config"
+)
+
+const defaultTimeout = 5*time.Second
+
+func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
+	dsn := BuildDSN(cfg)
+
+	poolCfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating pool: %w", err)
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	return pool, nil
+}
+
+func BuildDSN(cfg *config.Postgres) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
+}=== FILE: ./pkg/config/config.go ===
+package config
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+)
+
+// base config struct. use it in your custom ones.
+type Config struct {
+	Grpc     Grpc     `mapstructure:"grpc" yaml:"grpc"`
+	Infra    Infra    `mapstructure:"infra" yaml:"infra"`
+	Postgres Postgres `mapstructure:"postgres" yaml:"postgres"`
+	Logger   Logger   `mapstructure:"logger" yaml:"logger"`
+
+	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout" yaml:"graceful_shutdown_timeout"`
+}
+
+type Grpc struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+type Infra struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Postgres struct {
+	Host     string `mapstructure:"host" yaml:"host"`
+	Port     int    `mapstructure:"port" yaml:"port"`
+	User     string `mapstructure:"user" yaml:"user"`
+	Password string
+	DBName   string `mapstructure:"dbname" yaml:"dbname"`
+	MaxConns int    `mapstructure:"max_conns" yaml:"max_conns"`
+	SSLMode  string `mapstructure:"ssl_mode"`
+}
+type Logger struct {
+	Level string `mapstructure:"level" yaml:"level"`
+}
+
+const configYamlPath = "config/config.yaml"
+const configEnvPath = "config/.env"
+const postgresPasswordName = "POSTGRES_PASSWORD"
+
+
+// use it in your custom config struct
+func LoadInto(target any) error {
+	v := viper.New()
+	v.SetConfigFile(configYamlPath)
+
+	if err := v.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading config.yaml: %w", err)
+	}
+
+	if err := godotenv.Load(configEnvPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Println("no .env file found")
+	}
+
+	v.AutomaticEnv()
+
+	if err := v.Unmarshal(target); err != nil {
+		return fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	return nil
+}
+
+// old func, better use LoadInto with your custom config struct
+// migrations or small services use this
+func Load() (*Config, error) { 
+	cfg := &Config{}
+
+	if err := LoadInto(cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
+
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+// use it in your custom config struct
+func Validate(cfg *Config) error {
+	return cfg.validate()
+}
+func (c *Config) validate() error {
+	switch {
+	// grpc
+	case c.Grpc.Name == "":
+		return fmt.Errorf("invalid grpc name: empty")
+	case c.Grpc.Port <= 0:
+		return fmt.Errorf("invalid grpc port: %d, must be > 0", c.Grpc.Port)
+	case c.Grpc.Timeout <= 0 || c.Grpc.Timeout > time.Minute:
+		return fmt.Errorf("invalid grpc timeout: %s, must be > 0 and <= 1m", c.Grpc.Timeout)
+
+	// infra
+	case c.Infra.Name == "":
+		return fmt.Errorf("invalid infra name: empty")
+	case c.Infra.Port <= 0:
+		return fmt.Errorf("invalid infra port: %d, must be > 0", c.Infra.Port)
+	case c.Infra.Timeout <= 0 || c.Infra.Timeout > time.Minute:
+		return fmt.Errorf("invalid infra timeout: %s, must be > 0 and <= 1m", c.Infra.Timeout)
+
+	// logger
+	case c.Logger.Level == "":
+		return fmt.Errorf("invalid logger level: empty")
+
+	// postgres
+	case c.Postgres.SSLMode == "":
+		return fmt.Errorf("invalid ssl mode: empty")
+	case !isValidSSLMode(c.Postgres.SSLMode):
+		return fmt.Errorf(
+			"invalid ssl mode: %q, allowed: disable, allow, prefer, require, verify-ca, verify-full",
+			c.Postgres.SSLMode,
+		)
+	case c.Postgres.MaxConns <= 0:
+		return fmt.Errorf("invalid max conns: %d, must be > 0", c.Postgres.MaxConns)
+	case c.Postgres.Port <= 0:
+		return fmt.Errorf("invalid postgres port: %d, must be > 0", c.Postgres.Port)
+	case c.Postgres.User == "":
+		return fmt.Errorf("empty postgres user")
+	case c.Postgres.Password == "":
+		return fmt.Errorf("empty postgres password")
+	case c.Postgres.DBName == "":
+		return fmt.Errorf("empty postgres dbname")
+	case c.Postgres.Host == "":
+		return fmt.Errorf("empty postgres host")
+
+	// graceful shutdown
+	case c.GracefulShutdownTimeout <= 0 || c.GracefulShutdownTimeout > time.Minute:
+		return fmt.Errorf("invalid graceful shutdown timeout: %s, must be > 0 and <= 1m", c.GracefulShutdownTimeout)
+	default:
+		return nil
+	}
+}
+
+var validSSLModes = map[string]struct{}{
+	"disable":     {},
+	"allow":       {},
+	"prefer":      {},
+	"require":     {},
+	"verify-ca":   {},
+	"verify-full": {},
+}
+
+func isValidSSLMode(m string) bool {
+	_, ok := validSSLModes[m]
+	return ok
+}
+=== FILE: ./pkg/go.mod ===
+module github.com/monstrong/gracker2/pkg
+
+go 1.26.2
+
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/joho/godotenv v1.5.1
+	github.com/spf13/viper v1.21.0
+	go.uber.org/zap v1.28.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
+)
+=== FILE: ./pkg/errs/errors.go ===
+package errs
+
+import "errors"
+
+var (
+	ErrNotFound           = errors.New("record not found")
+	ErrInternal           = errors.New("internal server error")
+	ErrAlreadyExists      = errors.New("record already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrNameAlreadyExists  = errors.New("name already exists")  // for auth
+	ErrEmailAlreadyExists = errors.New("email already exists") // for auth
+	ErrPermissionDenied   = errors.New("permission denied")
+	ErrUserPatchEmpty     = errors.New("user patch is empty")
+	ErrPasswordMismatch   = errors.New("password mismatch")
+	ErrNoUpdates          = errors.New("no updates")
+	WrongMethod           = errors.New("wrong method")
+	BannedUser            = errors.New("user is banned")
+
+)
+
+// insted of ErrInvalidData
+type ValidationError struct {
+	Field  string
+	Reason string
+}
+
+type GatewayWrongFieldError struct {
+	Field  string
+	Reason string
+}
+
+func (e *ValidationError) Error() string {
+	return e.Reason
+}
+
+func (e *GatewayWrongFieldError) Error() string {
+	return e.Reason
+}=== FILE: ./pkg/interceptors/logger.go ===
+package interceptors
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/errs"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+)
+
+const DurationKey = "request-duration"
+
+func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		start := time.Now()
+		reqID := uuid.New().String()
+
+		MD, _ := metadata.FromIncomingContext(ctx)
+		var traceID string
+		vals := MD.Get(string(logger.LoggerTraceIDKey))
+		if len(vals) > 0 {
+			if _, err := uuid.Parse(vals[0]); err != nil {
+				l.Error(ctx, info.FullMethod, logger.Error(err))
+				traceID = uuid.New().String()
+			} else {
+				traceID = vals[0]
+			}
+		} else {
+			traceID = uuid.New().String()
+		}
+
+		ctx = logger.WithRequestID(ctx, reqID)
+		ctx = logger.WithTraceID(ctx, traceID)
+		res, err := handler(ctx, req)
+		duration := time.Since(start)
+
+		if err != nil {
+			var ve *errs.ValidationError
+			switch {
+			case errors.As(err, &ve):
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			case errors.Is(err, errs.ErrNotFound),
+				errors.Is(err, errs.ErrAlreadyExists),
+				errors.Is(err, errs.ErrInvalidCredentials),
+				errors.Is(err, errs.ErrNameAlreadyExists),
+				errors.Is(err, errs.ErrEmailAlreadyExists),
+				errors.Is(err, errs.ErrUserPatchEmpty),
+				errors.Is(err, errs.ErrPermissionDenied),
+				errors.Is(err, errs.ErrNoUpdates),
+				errors.Is(err, errs.ErrPasswordMismatch),
+				errors.Is(err, errs.WrongMethod),
+				errors.Is(err, errs.BannedUser):
+				
+				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			case errors.Is(err, context.DeadlineExceeded),
+				errors.Is(err, context.Canceled):
+				l.Warn(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			default:
+				l.Error(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+			}
+		} else {
+			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration))
+		}
+
+		err = toGRPCError(err) // значение меняется на статус код, для return
+
+		return res, err
+	}
+}
+
+func toGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var ve *errs.ValidationError
+	if errors.As(err, &ve) {
+		return status.Error(codes.InvalidArgument, ve.Reason)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	}
+	if errors.Is(err, context.Canceled) {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	if errors.Is(err, errs.ErrNotFound) {
+		return status.Error(codes.NotFound, errs.ErrNotFound.Error())
+	}
+	if errors.Is(err, errs.ErrAlreadyExists) {
+		return status.Error(codes.AlreadyExists, errs.ErrAlreadyExists.Error())
+	}
+	if errors.Is(err, errs.ErrUserPatchEmpty) {
+		return status.Error(codes.InvalidArgument, errs.ErrUserPatchEmpty.Error())
+	}
+	if errors.Is(err, errs.ErrInvalidCredentials) {
+		return status.Error(codes.Unauthenticated, errs.ErrInvalidCredentials.Error())
+	}
+	if errors.Is(err, errs.ErrNameAlreadyExists) { // for auth
+		return status.Error(codes.AlreadyExists, errs.ErrNameAlreadyExists.Error())
+	}
+	if errors.Is(err, errs.ErrEmailAlreadyExists) { // for auth
+		return status.Error(codes.AlreadyExists, errs.ErrEmailAlreadyExists.Error())
+	}
+	if errors.Is(err, errs.ErrPermissionDenied) {
+		return status.Error(codes.PermissionDenied, errs.ErrPermissionDenied.Error())
+	}
+	if errors.Is(err, errs.ErrPasswordMismatch) {
+		return status.Error(codes.Unauthenticated, errs.ErrPasswordMismatch.Error())
+	}
+	if errors.Is(err, errs.WrongMethod) {
+		return status.Error(codes.InvalidArgument, errs.WrongMethod.Error())
+	}
+	if errors.Is(err, errs.BannedUser) {
+		return status.Error(codes.PermissionDenied, errs.BannedUser.Error())
+	}
+	if errors.Is(err, errs.ErrNoUpdates) {
+		return nil // TODO: ченибудь придумать
+	}
+	return status.Error(codes.Internal, errs.ErrInternal.Error())
+}
+=== FILE: ./pkg/interceptors/recovery.go ===
+package interceptors
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/monstrong/gracker2/pkg/logger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+
+func RecoveryInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context, 
+		req any, 
+		info *grpc.UnaryServerInfo, 
+		handler grpc.UnaryHandler,
+		) (resp any, err error) {
+
+		defer func() {
+			if p := recover(); p != nil{
+				l.Error(ctx, "panic recovered",
+					logger.String("method", info.FullMethod),
+					logger.String("panic", fmt.Sprintf("%v", p)),
+				)
+
+				// подмена ошибки чтобы пользователь не увидел её текст
+				// это - то, для чего здесь возвращаемые параметры проименнованы
+				err = status.Error(codes.Internal, "internal server error") 
+			}
+		}()
+		return handler(ctx, req)
+	}
+}=== FILE: ./pkg/interceptors/timeoutAdder.go ===
+package interceptors
+
+import (
+	"context"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"google.golang.org/grpc"
+)
+
+func TimeoutInterceptor(cfg *config.Grpc) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context, 
+		req any, 
+		info *grpc.UnaryServerInfo, 
+		handler grpc.UnaryHandler,
+		) (resp any, err error) {
+
+		if _, ok := ctx.Deadline(); ok {
+			return handler(ctx, req)
+		}
+
+		ctxNew, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+		
+		return handler(ctxNew, req)
+			
+	}
+}=== FILE: ./pkg/logger/zap.go ===
+package logger
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"go.uber.org/zap"
+)
+
+type contextKey string
+
+const (
+	LoggerRequestIDKey contextKey = "x-request-id"
+	LoggerTraceIDKey   contextKey = "x-trace-id"
+)
+
+type Logger interface {
+	Info(ctx context.Context, msg string, fields ...Field)
+	Debug(ctx context.Context, msg string, fields ...Field)
+	Error(ctx context.Context, msg string, fields ...Field)
+	Warn(ctx context.Context, msg string, fields ...Field)
+	Sync()
+}
+
+type L struct {
+	z *zap.Logger
+}
+
+type Field = zap.Field
+
+
+func New(cfg *config.Logger) (*L, error) {
+
+	var logger *zap.Logger
+	var err error
+	var invalidLevel bool = false
+
+	switch cfg.Level {
+	case "dev", "development", "local":
+		logger, err = zap.NewDevelopment()
+	case "prod", "production":
+		logger, err = zap.NewProduction()
+	default:
+		logger, err = zap.NewProduction()
+		invalidLevel = true
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("creating logger:%w", err)
+	}
+
+	if invalidLevel {
+		logger.Warn("invalid logger level in config, fallback to production")
+		return &L{z: logger}, nil
+	}
+
+	return &L{z: logger}, nil
+}
+
+
+func WithRequestID (ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, LoggerRequestIDKey, id)
+}
+func WithTraceID (ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, LoggerTraceIDKey, id)
+}
+
+func (l *L) extractContextID (ctx context.Context) *zap.Logger{
+	logger := l.z
+	if reqID, ok := ctx.Value(LoggerRequestIDKey).(string); ok {
+		logger = logger.With(zap.String("x-request-id", reqID))
+	}
+
+	if traceID, ok := ctx.Value(LoggerTraceIDKey).(string); ok {
+		logger = logger.With(zap.String("x-trace-id", traceID))
+	}
+
+
+	return logger
+}
+
+func (l *L) Info(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Info(msg, fields...)
+}
+
+func (l *L) Warn(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Warn(msg, fields...)
+}
+
+func (l *L) Debug(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Debug(msg, fields...)
+}
+
+func (l *L) Error(ctx context.Context, msg string, fields ...Field) {
+	l.extractContextID(ctx).Error(msg, fields...)
+}
+
+func (l *L) Sync() {
+	_ = l.z.Sync()
+}
+
+func String(key string, val string) Field {
+	return zap.String(key, val)
+}
+
+func Int(key string, val int) Field {
+	return zap.Int(key, val)
+}
+
+func Duration(key string, val time.Duration) Field {
+	return zap.Duration(key, val)
+}
+
+func Error(err error) Field {
+	return zap.Error(err)
+}=== FILE: ./pkg/jwtparser/parser.go ===
+package jwtparser
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/domain"
+)
+
+type TokenManager interface {
+	Parse(tokenString string) (*Claims, error) // for API-gateway
+}
+
+type Manager struct {
+	signingKey      string
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+}
+
+type Claims struct {
+	UserID  uuid.UUID             `json:"user_id"`
+	Role    domain.Role        `json:"role"`
+	Premium domain.PremiumType `json:"premium"`
+	jwt.RegisteredClaims
+}
+
+func NewManager(signingKey string, accessTokenTTL time.Duration, refreshTokenTTL time.Duration) *Manager {
+	return &Manager{
+		signingKey:      signingKey,
+		accessTokenTTL:  accessTokenTTL,
+		refreshTokenTTL: refreshTokenTTL,
+	}
+}
+
+func (m *Manager) Parse(tokenString string) (*Claims, error) {
+	var claims Claims
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(m.signingKey), nil
+	},
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+	return &claims, nil
+}
+=== FILE: ./.gitignore ===
+.env
+*.env
+!.env.example=== FILE: ./docker-compose.yml ===
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gracker_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+volumes:
+  redis_data:
+  pgdata:=== FILE: ./proto/auth/v1/auth.proto ===
+syntax = "proto3";
+package auth.v1;
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc LogoutEverywhere(LogoutEverywhereRequest) returns (LogoutEverywhereResponse);
+  // rpc Validate(ValidateRequest) returns (ValidateResponse); - ПЕРЕНОС В API-GATEWAY
+
+  rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
+  rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse);
+
+  rpc GetMe(GetMeRequest) returns (GetMeResponse); // Свой профиль 
+  rpc GetUser(GetUserRequest) returns (GetUserResponse); // без email
+  rpc AdminGetUser(AdminGetUserRequest) returns (AdminGetUserResponse); // админу понадобился email
+
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc BanUser(BanUserRequest) returns (BanUserResponse);
+  rpc UnBanUser(UnBanUserRequest) returns (UnBanUserResponse);
+  
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message RegisterRequest {
+  string name = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message RegisterResponse { string id = 1; }
+
+message RefreshRequest { string refresh_token = 1; }
+
+message RefreshResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message ValidateRequest { string access_token = 1; }
+
+message ValidateResponse {
+  string id = 1;
+  Role role = 2;
+  Premium premium = 3;
+}
+
+message RoleUpdateRequest {
+  string target_user_id = 1;
+  Role new_role = 2;
+}
+
+message PremiumUpdateResponse {  bool updated = 1; }
+
+message PremiumUpdateRequest {
+  string target_user_id = 1;
+  Premium new_premium = 2;
+}
+
+message RoleUpdateResponse { bool updated = 1; }
+
+message GetMeRequest {}
+message GetMeResponse { User user = 1; }
+
+message GetUserRequest { string id = 1; }
+message GetUserResponse { PublicUser user = 1; }
+
+message DeleteUserRequest {  string id = 1; } // id == callerID || callerRole == admin
+message DeleteUserResponse { bool deleted = 1; }
+
+message AdminGetUserRequest { string id = 1; }
+message AdminGetUserResponse { User user = 1; }
+message UpdateUserRequest {
+  optional string name  = 1;
+  optional string email = 2;
+  optional string avatar_url = 3;
+  optional string bio = 4;
+}
+
+message UpdateUserResponse { User user = 1; }
+
+message ChangePasswordRequest {
+  string old_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse { bool updated = 1; }
+
+message LogoutRequest { string refresh_token = 1; }
+message LogoutResponse {}
+
+message LogoutEverywhereRequest {}
+message LogoutEverywhereResponse {}
+
+message BanUserRequest { string id = 1; }
+message BanUserResponse { bool banned = 1; }
+
+message UnBanUserRequest { string id = 1; }
+
+message UnBanUserResponse { bool unbanned = 1; }
+
+message PublicUser {
+  string  id         = 1;
+  string  name       = 2;
+  reserved 3;       // был email
+  Role    role       = 4;
+  Premium premium    = 5;
+  string  avatar_url = 6;
+  string  bio        = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message User {
+  string  id         = 1;
+  string  name       = 2;
+  string  email      = 3;
+  Role    role       = 4;
+  Premium premium    = 5;
+  string  avatar_url = 6;
+  string  bio        = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_BANNED = 1;
+  ROLE_USER = 2;
+  ROLE_MODERATOR = 3;
+  ROLE_ADMIN = 4;
+  ROLE_OWNER = 5;
+  ROLE_BILLING = 6;
+}
+
+enum Premium {
+  PREMIUM_UNSPECIFIED = 0;
+  PREMIUM_FREE = 1;
+  PREMIUM_PREMIUM = 2;
+}
+=== FILE: ./proto/go.mod ===
+module github.com/monstrong/gracker2/proto
+
+go 1.26.2
+
+require (
+	google.golang.org/grpc v1.81.1
+	google.golang.org/protobuf v1.36.11
+)
+
+require (
+	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
+)
+=== FILE: ./proto/torrent/v1/torrent.proto ===
+syntax = "proto3";
+package torrent.v1;
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/torrent/v1";
+
+import "google/protobuf/timestamp.proto";
+service TorrentService {
+  rpc GetTorrent(GetTorrentRequest) returns (GetTorrentResponse);
+  rpc CreateTorrent(CreateTorrentRequest) returns (CreateTorrentResponse);
+  rpc DeleteTorrent(DeleteTorrentRequest) returns (DeleteTorrentResponse);
+  rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
+}
+
+message GetTorrentRequest {
+  string id = 1;
+}
+
+message GetTorrentResponse {
+  Torrent torrent = 1;
+}
+
+message ListTorrentsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListTorrentsResponse {
+  repeated Torrent torrents = 1;
+}
+
+message CreateTorrentRequest {
+  string name = 1;
+  string description = 2;
+  string info_hash = 3;
+  string author_id = 4;
+  string category_id = 5;
+}
+
+message CreateTorrentResponse {
+  Torrent torrent = 1;
+}
+
+message DeleteTorrentRequest {
+  string id = 1;
+}
+message DeleteTorrentResponse {
+  bool deleted = 1;
+}
+message Torrent {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string info_hash = 4;
+  string author_id = 5;
+  string category_id = 6;
+  int32 status = 7;
+  int64 downloads = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+=== FILE: ./.env.example ===
+POSTGRES_PASSWORD==== FILE: ./scripts/init-db.sql ===
+CREATE DATABASE gracker_torrents;
+CREATE DATABASE gracker_users;=== FILE: ./torrent-service/cmd/server/main.go ===
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/monstrong/gracker2/torrent-service/internal/app"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	a, err := app.New(ctx)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+
+	return a.Run(ctx)
+}=== FILE: ./torrent-service/cmd/migrate/main.go ===
+package main
+
+import (
+	"errors"
+	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	dsn := db.BuildDSN(&cfg.Postgres)
+
+	m, err := migrate.New("file://migrations", dsn)
+	if err != nil {
+		l.Error("error creating migration", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if len(os.Args) < 2 {
+		l.Error("add command")
+		os.Exit(1)
+	}
+	command := os.Args[1]
+	switch command {
+	case "up":
+		err = m.Up()
+	case "down":
+		err = m.Down()
+	case "step":
+		if len(os.Args) > 2 && os.Args[2] != "" {
+			steps, parseErr := strconv.Atoi(os.Args[2])
+			if parseErr != nil {
+				l.Error("error converting steps to int", slog.String("error", parseErr.Error()))
+				os.Exit(1)
+			}
+			err = m.Steps(steps)
+		} else {
+			l.Error("add number of steps")
+			os.Exit(1)
+		}
+	default:
+		l.Error("wrong command")
+		os.Exit(1)
+	}
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			l.Info("database is already up")
+		} else {
+			l.Error("error doing migration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}
+}
+
+=== FILE: ./torrent-service/TODO.md ===
+1. реализовать Update с частичным обновлением
+2. реализовать List с любыми фильтрами и редактируемым ORDER BY
+3. Умный поиск
+
+4. тесты для toGRPCError (table-driven)
+5. задействовать infra timeout
+6. Трейсинг: OpenTelemetry вместо x-trace-id
+7. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)+++
+=== FILE: ./torrent-service/config/.env.example ===
+POSTGRES_PASSWORD==== FILE: ./torrent-service/config/config.yaml ===
+grpc:
+  name: torrent-service
+  port: 50051
+  timeout: 5s
+infra:
+  name: infra
+  port: 8080
+  timeout: 5s
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_torrents
+  max_conns: 10
+  ssl_mode: disable
+logger:
+  level: local
+graceful_shutdown_timeout: 15s=== FILE: ./torrent-service/migrations/000001_create_torrents.up.sql ===
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS torrents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    info_hash VARCHAR(64) NOT NULL UNIQUE,
+    status SMALLINT NOT NULL DEFAULT 0,
+    author_id UUID NOT NULL,
+    category_id UUID NOT NULL,
+    downloads INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+=== FILE: ./torrent-service/migrations/000001_create_torrents.down.sql ===
+DROP TABLE IF EXISTS torrents;
+=== FILE: ./torrent-service/go.mod ===
+module github.com/monstrong/gracker2/torrent-service
+
+go 1.26.2
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/monstrong/gracker2/pkg v0.0.0-00010101000000-000000000000
+	github.com/monstrong/gracker2/proto v0.1.0
+	google.golang.org/grpc v1.84.0
+	google.golang.org/protobuf v1.36.11
+)
+
+require (
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/lib/pq v1.10.9 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/spf13/viper v1.21.0 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+)
+
+require (
+	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/prometheus/client_golang v1.23.2
+	go.uber.org/zap v1.28.0 // indirect
+	golang.org/x/sync v0.22.0
+	golang.org/x/text v0.40.0 // indirect
+)
+
+replace github.com/monstrong/gracker2/pkg => ../pkg
+
+replace github.com/monstrong/gracker2/proto => ../proto
+=== FILE: ./torrent-service/internal/app/app.go ===
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/pkg/logger"
+	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	"github.com/monstrong/gracker2/torrent-service/internal/repository"
+	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+)
+
+type App struct {
+	cfg        *config.Config
+	l          logger.Logger
+	pool       *pgxpool.Pool
+	grpcServer *grpc.Server
+	httpServer *http.Server
+}
+
+func New(ctx context.Context) (*App, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("init config: %w", err)
+	}
+
+	l, err := logger.New(&cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("init logger: %w", err)
+	}
+	l.Info(ctx, "config & logger init complete")
+
+	// создаёт пул и делает Ping
+	pool, err := db.NewPool(&cfg.Postgres)
+	if err != nil {
+		return nil, fmt.Errorf("create db pool: %w", err)
+	}
+	l.Info(ctx, "db pool init complete")
+
+	repo := repository.NewPostgresRepository(pool)
+	svc := service.NewTorrentService(repo)
+	handler := transport.NewServer(svc)
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptors.RecoveryInterceptor(l),
+			interceptors.LoggingInterceptor(l),
+			interceptors.TimeoutInterceptor(&cfg.Grpc),
+		))
+	pb.RegisterTorrentServiceServer(grpcServer, handler)
+
+	httpServer := infraServerInit(pool, cfg.Infra.Port, l)
+
+	return &App{
+		cfg:        cfg,
+		l:          l,
+		pool:       pool,
+		grpcServer: grpcServer,
+		httpServer: httpServer,
+	}, nil
+}
+
+func (a *App) Run(ctx context.Context) error {
+	logCtx := context.WithoutCancel(ctx)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// gRPC-сервер
+	g.Go(func() error {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.cfg.Grpc.Port))
+		if err != nil {
+			return fmt.Errorf("grpc listen: %w", err)
+		}
+		a.l.Info(logCtx, "grpc server starting", logger.Int("port", a.cfg.Grpc.Port))
+
+		err = a.grpcServer.Serve(lis)
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return nil
+		}
+		return err
+	})
+
+	// http-сервер (health, ready, metrics)
+	g.Go(func() error {
+		a.l.Info(logCtx, "http infra server starting")
+
+		err := a.httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil // после Shutdown это не ошибка
+		}
+		return err
+	})
+
+	// Сторож: спит, пока не придёт сигнал или не упадёт один из серверов
+	g.Go(func() error {
+		<-gctx.Done()
+		return a.shutdown(logCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		a.l.Error(logCtx, "torrent-service stopped with error", logger.Error(err))
+		return err
+	}
+	a.l.Info(logCtx, "torrent-service stopped gracefully")
+	return nil
+}
+
+// shutdown останавливает оба сервера одновременно
+func (a *App) shutdown(ctx context.Context) error {
+	a.l.Info(ctx, "shutting down")
+
+	timeout, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
+	defer cancel()
+
+	grpcStopped := make(chan struct{})
+	httpStopped := make(chan struct{})
+	allStopped := make(chan struct{})
+	
+
+	go func() {
+		defer close(grpcStopped)
+		a.grpcServer.GracefulStop()
+
+	}()
+	var httpErr error
+	go func() {
+		defer close(httpStopped)
+		httpErr = a.httpServer.Shutdown(timeout)
+	}()
+	go func() {
+		<-grpcStopped
+		<-httpStopped
+		close(allStopped)
+	}()
+
+	select {
+	case <-allStopped:
+		if httpErr != nil {
+			a.httpServer.Close()
+			return fmt.Errorf("http shutdown: %w", httpErr)
+		}
+		a.l.Info(ctx, "grpc and http servers stopped gracefully")
+		return nil
+	case <-timeout.Done():
+		a.l.Error(ctx, "shutdown timed out, forcing stop")
+		a.grpcServer.Stop()
+		a.httpServer.Close()
+		return errors.New("shutdown timeout: servers were stopped forcibly")
+	}
+}
+
+func (a *App) Close() error {
+	a.pool.Close()
+
+	a.l.Sync()
+
+	return nil
+}=== FILE: ./torrent-service/internal/app/infra.go ===
+package app
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+func infraServerInit(pool *pgxpool.Pool, port int, l logger.Logger) *http.Server {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("ERROR"))
+			l.Error(ctx, "error on connection to db", logger.Error(err))
+			
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}
+	})
+
+	mux.Handle("/metrics", promhttp.Handler())
+
+	return &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+}
+=== FILE: ./torrent-service/internal/service/interface.go ===
+package service
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+)
+
+type Service interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error)
+	List(ctx context.Context, limit, offset int) ([]*models.Torrent, error)
+	Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error)
+	Delete(ctx context.Context, id uuid.UUID) (bool, error)
+}
+=== FILE: ./torrent-service/internal/service/service.go ===
+package service
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+	"github.com/monstrong/gracker2/torrent-service/internal/repository"
+)
+
+type TorrentService struct {
+	r repository.Repository
+}
+
+func NewTorrentService(r repository.Repository) *TorrentService {
+	return &TorrentService{r: r}
+}
+
+func (s *TorrentService) Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error) {
+	const op = "service.torrentService.create"
+
+	switch {
+	case torrent.Name == "":
+		return nil, &errs.ValidationError{Field: "name", Reason: "'name' is required"}
+	case torrent.InfoHash == "":
+		return nil, &errs.ValidationError{Field: "info_hash", Reason: "'info_hash' is required"}
+	case torrent.AuthorID == uuid.Nil:
+		return nil, &errs.ValidationError{Field: "authorID", Reason: "'authorID' is required"}
+	case torrent.CategoryID == uuid.Nil:
+		return nil, &errs.ValidationError{Field: "categoryID", Reason: "'categoryID' is required"}
+	}
+
+	m, err := s.r.Create(ctx, torrent)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return m, nil
+}
+
+func (s *TorrentService) Delete(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "service.torrentService.delete"
+
+	if id == uuid.Nil {
+		return false, &errs.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	isDeleted, err := s.r.Delete(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return isDeleted, nil
+}
+
+func (s *TorrentService) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
+	const op = "service.torrentService.list"
+
+	if limit <= 0 || limit > models.MaxLimit {
+		return nil, &errs.ValidationError{Field: "limit", Reason: "invalid limit"}
+	}
+	if offset < 0 || offset > models.MaxOffset {
+		return nil, &errs.ValidationError{Field: "offset", Reason: "invalid offset"}
+	}
+	ms, err := s.r.List(ctx, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return ms, nil
+}
+
+func (s *TorrentService) GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error) {
+	const op = "service.torrentService.getByID"
+
+	if id == uuid.Nil {
+		return nil, &errs.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	m, err := s.r.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return m, nil
+}
+=== FILE: ./torrent-service/internal/repository/interface.go ===
+package repository
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+)
+
+type Repository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error)
+	List(ctx context.Context, limit, offset int) ([]*models.Torrent, error)
+	Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error)
+	Delete(ctx context.Context, id uuid.UUID) (bool, error)
+}
+=== FILE: ./torrent-service/internal/repository/postgres.go ===
+package repository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+)
+
+type PostgresRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
+	return &PostgresRepository{
+		db: db,
+	}
+}
+
+func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*models.Torrent, error) {
+	const op = "repo.postgres.create"
+	query := `
+	INSERT INTO torrents (name, description, info_hash, author_id, category_id)
+	VALUES ($1, $2, $3, $4, $5)
+	RETURNING id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at
+	`
+	err := r.db.QueryRow(ctx, query,
+		t.Name,
+		t.Description,
+		t.InfoHash,
+		t.AuthorID,
+		t.CategoryID,
+	).Scan(
+		&t.ID,
+		&t.Name,
+		&t.Description,
+		&t.InfoHash,
+		&t.Status,
+		&t.AuthorID,
+		&t.CategoryID,
+		&t.Downloads,
+		&t.CreatedAt,
+		&t.UpdatedAt,
+	)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // «есть ли в цепочке обёрток ошибка типа target?». Ошибка постгреса
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrAlreadyExists)
+
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return t, nil
+
+}
+
+func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
+	const op = "repo.postgres.list"
+	var ts []*models.Torrent
+	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents 
+	ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := r.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var t models.Torrent
+		err := rows.Scan(
+			&t.ID,
+			&t.Name,
+			&t.Description,
+			&t.InfoHash,
+			&t.Status,
+			&t.AuthorID,
+			&t.CategoryID,
+			&t.Downloads,
+			&t.CreatedAt,
+			&t.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		ts = append(ts, &t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return ts, nil
+}
+
+func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Torrent, error) {
+	const op = "repo.postgres.getbyid"
+
+	var t models.Torrent
+	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents WHERE id = $1`
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&t.ID,
+		&t.Name,
+		&t.Description,
+		&t.InfoHash,
+		&t.Status,
+		&t.AuthorID,
+		&t.CategoryID,
+		&t.Downloads,
+		&t.CreatedAt,
+		&t.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &t, nil
+}
+
+func (r *PostgresRepository) Delete(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "repo.postgres.delete"
+
+	tag, err := r.db.Exec(ctx, `DELETE FROM torrents WHERE id = $1`, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	switch tag.RowsAffected() {
+	case 0:
+		return false, nil
+	case 1:
+		return true, nil
+	default: // тут можно вернуть "предупреждение", о том что удалилось больше одной записи
+		return true, nil
+	}
+}
+=== FILE: ./torrent-service/internal/transport/grpc/grpc.go ===
+package grpc
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+type Server struct {
+	pb.UnimplementedTorrentServiceServer
+	s service.Service
+}
+
+func NewServer(s service.Service) *Server{
+	return &Server{s: s}
+}
+
+// Тут нет смысла добавлять "op" в ошибки. вызываемый метод уже известен клиенту
+
+func (s *Server) GetTorrent(ctx context.Context, in *pb.GetTorrentRequest) (*pb.GetTorrentResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	m, err := s.s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GetTorrentResponse{Torrent: toProto(m)}, nil
+}
+
+func (s *Server) ListTorrents(ctx context.Context, in *pb.ListTorrentsRequest) (*pb.ListTorrentsResponse, error) {
+	ms, err := s.s.List(ctx, int(in.GetLimit()), int(in.GetOffset()))
+	if err != nil {
+		return nil, err
+	}
+	pbTorrents := make([]*pb.Torrent, 0, len(ms))
+
+	for _, m := range ms {
+		pbTorrent := toProto(m)
+		pbTorrents = append(pbTorrents, pbTorrent)
+	}
+
+	return &pb.ListTorrentsResponse{Torrents: pbTorrents}, nil
+}
+
+func (s *Server) CreateTorrent(ctx context.Context, in *pb.CreateTorrentRequest) (*pb.CreateTorrentResponse, error) {
+	authorID, err := uuid.Parse(in.GetAuthorId())
+	if err != nil {
+		return nil, &errs.ValidationError{Field: "authorID", Reason: "invalid authorID id format"}
+	}
+	categoryID, err := uuid.Parse(in.GetCategoryId())
+	if err != nil {
+		return nil, &errs.ValidationError{Field: "categoryID", Reason: "invalid categoryID id format"}
+	}
+	t := models.Torrent{Name: in.GetName(), 
+		Description: in.GetDescription(), 
+		InfoHash: in.GetInfoHash(), 
+		AuthorID: authorID,
+		CategoryID: categoryID,
+	}
+	m, err := s.s.Create(ctx, &t)
+	if err != nil{
+		return nil, err
+	}
+
+	return &pb.CreateTorrentResponse{Torrent: toProto(m)}, nil
+}
+
+
+func (s *Server) DeleteTorrent(ctx context.Context, in *pb.DeleteTorrentRequest) (*pb.DeleteTorrentResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.ValidationError{Field: "id", Reason: "invalid torrent id format"}
+	}
+
+	ok, err := s.s.Delete(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DeleteTorrentResponse{Deleted: ok}, nil
+}
+
+
+func toProto(m *models.Torrent) *pb.Torrent {
+	return &pb.Torrent{
+		Id: m.ID.String(), 
+		Name: m.Name,
+		Description: m.Description,
+		InfoHash: m.InfoHash,
+		AuthorId: m.AuthorID.String(),
+		CategoryId: m.CategoryID.String(),
+		Status: int32(m.Status),
+		Downloads: int64(m.Downloads),
+		CreatedAt: timestamppb.New(m.CreatedAt),
+		UpdatedAt: timestamppb.New(m.UpdatedAt),
+	}
+}=== FILE: ./torrent-service/internal/models/torrent.go ===
+package models
+
+import (
+	"github.com/google/uuid"
+	"time"
+)
+
+type Torrent struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Description string    `db:"description"`
+	InfoHash    string    `db:"info_hash"`
+	Status      int       `db:"status"`
+	AuthorID    uuid.UUID `db:"author_id"`
+	CategoryID  uuid.UUID `db:"category_id"`
+	Downloads   int       `db:"downloads"`
+	CreatedAt   time.Time `db:"created_at"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+
+const (
+	MaxLimit = 200
+	MaxOffset = 1000000
+)=== FILE: ./torrent-service/Makefile ===
+include config/.env
+export
+
+.PHONY: migrate-up migrate-down migrate-step migrate-step-down run
+
+migrate-up:
+	go run ./cmd/migrate up
+
+migrate-down:
+	go run ./cmd/migrate down
+
+migrate-step:
+	go run ./cmd/migrate step 1
+
+migrate-step-down:
+	go run ./cmd/migrate step -1
+
+run:
+	go run ./cmd/server=== FILE: ./all_code.txt ===
+=== FILE: ./zametki.txt ===
+В следующий раз вместо updated/banned и тд. буду возвращать rows.Affected.
+=== FILE: ./testing_field/go.mod ===
+module github/monstrong/gracker2/testing_field
+
+go 1.26.2
+
+require github.com/google/uuid v1.6.0
+=== FILE: ./testing_field/main.go ===
+package main
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+)
+
+func main() {
+	var id uuid.UUID
+	fmt.Println(id)
+}=== FILE: ./Makefile ===
+.PHONY: proto proto-clean $(addprefix proto-,$(SERVICES))
+
+# да, этот файл я сгенерил в нейронке
+
+MODULE := github.com/monstrong/gracker2
+PROTO_OPTS := --go_out=. --go_opt=module=$(MODULE) --go-grpc_out=. --go-grpc_opt=module=$(MODULE)
+
+# Список сервисов
+SERVICES := torrent auth
+
+# Версия по умолчанию - последняя (находим максимальную)
+LATEST_VERSION := $(shell ls -d proto/*/v* 2>/dev/null | sed 's/.*\/v//' | sort -n | tail -1)
+VERSION ?= v$(LATEST_VERSION)
+
+# Если VERSION не задана и нет папок, ставим v1
+ifeq ($(VERSION),)
+VERSION := v1
+endif
+
+# Все proto файлы
+PROTO_FILES := $(foreach s,$(SERVICES),proto/$(s)/$(VERSION)/$(s).proto)
+
+proto: $(PROTO_FILES)
+	@echo "Генерация для версии $(VERSION)"
+	@protoc -I. $(PROTO_OPTS) $^
+
+# Генерация для конкретного сервиса
+$(addprefix proto-,$(SERVICES)): proto-%:
+	@echo "Генерация $* для версии $(VERSION)"
+	@protoc -I. $(PROTO_OPTS) proto/$*/$(VERSION)/$*.proto
+
+proto-clean:
+	@rm -rf proto/gen/go
+
+proto-versions:
+	@echo "Доступные версии:"
+	@ls -d proto/*/v* 2>/dev/null | sed 's/.*\/v//' | sort -n | uniq=== FILE: ./auth-service/cmd/server/main.go ===
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/monstrong/gracker2/auth-service/internal/app"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	a, err := app.New(ctx)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+
+	return a.Run(ctx)
+}=== FILE: ./auth-service/cmd/migrate/main.go ===
+package main
+
+import (
+	"errors"
+	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/monstrong/gracker2/pkg/db"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	dsn := db.BuildDSN(&cfg.Postgres)
+
+	m, err := migrate.New("file://migrations", dsn)
+	if err != nil {
+		l.Error("error creating migration", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	if len(os.Args) < 2 {
+		l.Error("add command")
+		os.Exit(1)
+	}
+	command := os.Args[1]
+	switch command {
+	case "up":
+		err = m.Up()
+	case "down":
+		err = m.Down()
+	case "step":
+		if len(os.Args) > 2 && os.Args[2] != "" {
+			steps, parseErr := strconv.Atoi(os.Args[2])
+			if parseErr != nil {
+				l.Error("error converting steps to int", slog.String("error", parseErr.Error()))
+				os.Exit(1)
+			}
+			err = m.Steps(steps)
+		} else {
+			l.Error("add number of steps")
+			os.Exit(1)
+		}
+	default:
+		l.Error("wrong command")
+		os.Exit(1)
+	}
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			l.Info("database is already up")
+		} else {
+			l.Error("error doing migration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}
+}
+
+=== FILE: ./auth-service/pkg/jwtmanager/jwt.go ===
+package jwtmanager
+
+import (
+	"crypto/rand"
+	"fmt"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/jwtparser"
+)
+
+type Manager struct {
+	signingKey      string
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+}
+
+type Claims = jwtparser.Claims
+
+func NewManager(signingKey string, accessTokenTTL time.Duration, refreshTokenTTL time.Duration) *Manager {
+	return &Manager{
+		signingKey:      signingKey,
+		accessTokenTTL:  accessTokenTTL,
+		refreshTokenTTL: refreshTokenTTL,
+	}
+}
+
+func (m *Manager) NewToken(userID uuid.UUID, role models.Role, premium models.PremiumType) (string, error) {
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+		UserID:  userID,
+		Role:    role,
+		Premium: premium,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	})
+
+	token, err := t.SignedString([]byte(m.signingKey))
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (m *Manager) NewRefreshToken() (string, error) {
+	b := make([]byte, 32)
+
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", b), nil
+}
+
+func (m *Manager) RefreshTTL() time.Duration {
+	return m.refreshTokenTTL
+}=== FILE: ./auth-service/pkg/hasher/hasher.go ===
+package hasher
+
+import (
+	"errors"
+
+	"github.com/monstrong/gracker2/pkg/errs"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type SimpleHasher struct{
+	cost int
+}
+
+func NewSimpleHasher(cost int) *SimpleHasher {
+	return &SimpleHasher{cost: cost}
+}
+
+func (s *SimpleHasher) HashPassword(password string) (string, error) { 
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.cost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+func (s *SimpleHasher) CheckPassword(password, hash string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+        return errs.ErrPasswordMismatch
+    }
+	return err
+}
+
+=== FILE: ./auth-service/pkg/redisclient/redis.go ===
+package redisclient
+
+import (
+	"context"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/monstrong/gracker2/auth-service/internal/authconfig"
+)
+
+func NewClient(ctx context.Context, cfg *authconfig.Redis) (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:         cfg.Addr,
+		Password:     cfg.Password,
+		DB:           cfg.DB,
+		DialTimeout:  cfg.DialTimeout,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+	})
+
+	
+	if err := client.Ping(ctx).Err(); err != nil {
+
+		_ = client.Close()
+		return nil, err
+	}
+	return client, nil
+}
+
+func Close(client *redis.Client) error {
+	return client.Close()
+}=== FILE: ./auth-service/TODO.md ===
+1. задействовать infra timeout
+2. Трейсинг: OpenTelemetry вместо x-trace-id
+3. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)
+
+4. Механизм актуализации ролей: если роль или премиум изменились в БД, уже выданный JWT продолжит содержать старые значения до истечения срока действия, если не добавить механизм актуализации.=== FILE: ./auth-service/config/.env.example ===
+POSTGRES_PASSWORD=
+JWT_SECRET==== FILE: ./auth-service/config/config.yaml ===
+grpc:
+  name: auth-service
+  port: 50052
+  timeout: 5s
+infra:
+  name: infra
+  port: 8081
+  timeout: 5s
+postgres:
+  host: localhost
+  port: 5432
+  user: postgres
+  dbname: gracker_users
+  max_conns: 10
+  ssl_mode: disable
+redis:
+  addr: "localhost:6379"
+  db: 0
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+logger:
+  level: local
+graceful_shutdown_timeout: 15s
+hasher:
+  cost: 10
+jwt:
+  access_token_ttl: 15m
+  refresh_token_ttl: 24h=== FILE: ./auth-service/migrations/000002_premium.up.sql ===
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS premium SMALLINT NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS bio        VARCHAR(500) NOT NULL DEFAULT '';
+=== FILE: ./auth-service/migrations/000001_create_users.down.sql ===
+DROP TABLE IF EXISTS users;
+
+=== FILE: ./auth-service/migrations/000001_create_users.up.sql ===
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role SMALLINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- migrate create -ext sql -dir migrations -seq add_something_to_users=== FILE: ./auth-service/migrations/000002_premium.down.sql ===
+ALTER TABLE users 
+    DROP COLUMN IF EXISTS premium,
+    DROP COLUMN IF EXISTS avatar_url,
+    DROP COLUMN IF EXISTS bio;=== FILE: ./auth-service/go.mod ===
+module github.com/monstrong/gracker2/auth-service
+
+go 1.26.2
+
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/monstrong/gracker2/pkg v0.0.0-00010101000000-000000000000
+	github.com/monstrong/gracker2/proto v0.1.0
+	github.com/prometheus/client_golang v1.25.0
+	github.com/redis/go-redis/v9 v9.23.0
+	golang.org/x/crypto v0.58.0
+	golang.org/x/sync v0.24.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/spf13/viper v1.21.0 // indirect
+	go.uber.org/atomic v1.12.0 // indirect
+)
+
+require (
+	github.com/Masterminds/squirrel v1.5.4
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/lib/pq v1.10.9 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/prometheus/client_model v0.6.3 // indirect
+	github.com/prometheus/common v0.72.0 // indirect
+	github.com/prometheus/procfs v0.22.0 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/zap v1.28.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
+)
+
+replace github.com/monstrong/gracker2/pkg => ../pkg
+
+replace github.com/monstrong/gracker2/proto => ../proto
+=== FILE: ./auth-service/internal/app/app.go ===
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/auth-service/internal/authconfig"
+	"github.com/monstrong/gracker2/auth-service/internal/repository"
+	"github.com/monstrong/gracker2/auth-service/internal/service"
+	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
+	"github.com/monstrong/gracker2/auth-service/pkg/hasher"
+	"github.com/monstrong/gracker2/auth-service/pkg/jwtmanager"
+	"github.com/monstrong/gracker2/auth-service/pkg/redisclient"
+	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/pkg/interceptors"
+	"github.com/monstrong/gracker2/pkg/logger"
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+)
+
+type App struct {
+	cfg        *authconfig.Config
+	l          logger.Logger
+	pool       *pgxpool.Pool
+	grpcServer *grpc.Server
+	httpServer *http.Server
+}
+
+func New(ctx context.Context) (*App, error) {
+	cfg, err := authconfig.Load()
+	if err != nil {
+		return nil, fmt.Errorf("init config: %w", err)
+	}
+
+	l, err := logger.New(&cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("init logger: %w", err)
+	}
+	l.Info(ctx, "config & logger init complete")
+
+	// создаёт пул и делает Ping
+	pool, err := db.NewPool(&cfg.Postgres)
+	if err != nil {
+		return nil, fmt.Errorf("create db pool: %w", err)
+	}
+	l.Info(ctx, "db pool init complete")
+
+	rclient, err := redisclient.NewClient(ctx, &cfg.Redis)
+	if err != nil {
+		return nil, fmt.Errorf("create redis client: %w", err)
+	}
+	l.Info(ctx, "redis client init complete")
+
+	urepo := repository.NewPostgresRepository(pool)
+	rfrepo := repository.NewRedisRepository(rclient)
+	m := jwtmanager.NewManager(cfg.JWT.SigningKey, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL)
+	h := hasher.NewSimpleHasher(cfg.Hasher.Cost)
+	
+	svc := service.New(m, h, urepo, rfrepo)
+	handler := transport.NewServer(svc)
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptors.RecoveryInterceptor(l),
+			interceptors.LoggingInterceptor(l),
+			interceptors.TimeoutInterceptor(&cfg.Grpc),
+		))
+	pb.RegisterAuthServiceServer(grpcServer, handler)
+
+	httpServer := infraServerInit(pool, cfg.Infra.Port, l)
+
+	return &App{
+		cfg:        cfg,
+		l:          l,
+		pool:       pool,
+		grpcServer: grpcServer,
+		httpServer: httpServer,
+	}, nil
+}
+
+func (a *App) Run(ctx context.Context) error {
+	logCtx := context.WithoutCancel(ctx)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// gRPC-сервер
+	g.Go(func() error {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.cfg.Grpc.Port))
+		if err != nil {
+			return fmt.Errorf("grpc listen: %w", err)
+		}
+		a.l.Info(logCtx, "grpc server starting", logger.Int("port", a.cfg.Grpc.Port))
+
+		err = a.grpcServer.Serve(lis)
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return nil
+		}
+		return err
+	})
+
+	// http-сервер (health, ready, metrics)
+	g.Go(func() error {
+		a.l.Info(logCtx, "http infra server starting")
+
+		err := a.httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil // после Shutdown это не ошибка
+		}
+		return err
+	})
+
+	// Сторож: спит, пока не придёт сигнал или не упадёт один из серверов
+	g.Go(func() error {
+		<-gctx.Done()
+		return a.shutdown(logCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		a.l.Error(logCtx, "auth-service stopped with error", logger.Error(err))
+		return err
+	}
+	a.l.Info(logCtx, "auth-service stopped gracefully")
+	return nil
+}
+
+// shutdown останавливает оба сервера одновременно
+func (a *App) shutdown(ctx context.Context) error {
+	a.l.Info(ctx, "shutting down")
+
+	timeout, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
+	defer cancel()
+
+	grpcStopped := make(chan struct{})
+	httpStopped := make(chan struct{})
+	allStopped := make(chan struct{})
+	
+
+	go func() {
+		defer close(grpcStopped)
+		a.grpcServer.GracefulStop()
+
+	}()
+	var httpErr error
+	go func() {
+		defer close(httpStopped)
+		httpErr = a.httpServer.Shutdown(timeout)
+	}()
+	go func() {
+		<-grpcStopped
+		<-httpStopped
+		close(allStopped)
+	}()
+
+	select {
+	case <-allStopped:
+		if httpErr != nil {
+			a.httpServer.Close()
+			return fmt.Errorf("http shutdown: %w", httpErr)
+		}
+		a.l.Info(ctx, "grpc and http servers stopped gracefully")
+		return nil
+	case <-timeout.Done():
+		a.l.Error(ctx, "shutdown timed out, forcing stop")
+		a.grpcServer.Stop()
+		a.httpServer.Close()
+		return errors.New("shutdown timeout: servers were stopped forcibly")
+	}
+}
+
+func (a *App) Close() error {
+	a.pool.Close()
+
+	a.l.Sync()
+
+	return nil
+}=== FILE: ./auth-service/internal/app/infra.go ===
+package app
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+func infraServerInit(pool *pgxpool.Pool, port int, l logger.Logger) *http.Server {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("ERROR"))
+			l.Error(ctx, "error on connection to db", logger.Error(err))
+			
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}
+	})
+
+	mux.Handle("/metrics", promhttp.Handler())
+
+	return &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+}
+=== FILE: ./auth-service/internal/service/auth.go ===
+package service
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+)
+
+
+
+func (s *UserService) Login(ctx context.Context, email, password string) (access, refresh string, err error) {
+	const op = "service.User.Login"
+	if err := validateEmail(email); err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+	u, err := s.urepo.GetUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return "", "", fmt.Errorf("%s: %w", op, errs.ErrInvalidCredentials) // не раскрываем
+		}
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+	if u.Role == models.BannedRole {
+		return "", "", fmt.Errorf("%s: %w", op, errs.BannedUser)
+	}
+
+	if err = s.h.CheckPassword(password, u.PasswordHash); err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	access, err = s.m.NewToken(u.ID, u.Role, u.Premium)
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	refresh, err = s.m.NewRefreshToken()
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	err = s.rfrepo.SetRefreshToken(ctx, hashToken(refresh), u.ID.String(), s.m.RefreshTTL())
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	return access, refresh, nil
+}
+
+func (s *UserService) Logout(ctx context.Context, rawRefresh string) (bool, error) {
+    const op = "service.User.Logout"
+    if rawRefresh == "" {
+        return false, nil
+    }
+    if err := s.rfrepo.DeleteRefreshToken(ctx, hashToken(rawRefresh)); err != nil {
+        return false, fmt.Errorf("%s: %w", op, err)
+    }
+    return true, nil
+}
+
+func (s *UserService) LogoutEverywhere(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "service.User.LogoutEverywhere"
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return true, nil
+}
+
+func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, newRefresh string, err error) {
+    const op = "service.User.Refresh"
+
+    if rawRefresh == "" {
+        return "", "", fmt.Errorf("%s: %w", op, &errs.ValidationError{Field: "refresh_token", Reason: "required"})
+    }
+
+    newRaw, err := s.m.NewRefreshToken()
+    if err != nil {
+        return "", "", fmt.Errorf("%s: %w", op, err)
+    }
+
+    userIDStr, err := s.rfrepo.RotateRefreshToken(
+        ctx, hashToken(rawRefresh), hashToken(newRaw), s.m.RefreshTTL(),
+    )
+    if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return "", "", fmt.Errorf("%s: %w", op, errs.ErrInvalidCredentials) // → 401
+		}
+        return "", "", fmt.Errorf("%s: %w", op, err)
+    }
+
+    userID, err := uuid.Parse(userIDStr)
+    if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
+        return "", "", fmt.Errorf("%s: %w", op, err)
+    }
+
+    u, err := s.urepo.GetUserPrivate(ctx, userID) // актуальные role/premium
+    if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
+        return "", "", fmt.Errorf("%s: %w", op, err)
+    }
+
+	if u.Role == models.BannedRole {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
+		return "", "", fmt.Errorf("%s: %w", op, errs.BannedUser)
+	}
+
+    access, err = s.m.NewToken(u.ID, u.Role, u.Premium)
+    if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
+        return "", "", fmt.Errorf("%s: %w", op, err)
+    }
+
+    return access, newRaw, nil
+}
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}=== FILE: ./auth-service/internal/service/infrastructure.go ===
+package service
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+
+)
+
+type UserService struct {
+	m TokenManager
+	h Hasher
+
+	urepo  UserRepository
+	rfrepo RefreshRepository
+}
+
+func New(
+    m TokenManager,
+    h Hasher,
+    urepo UserRepository,
+    rfrepo RefreshRepository,
+) *UserService {
+    return &UserService{m: m, h: h, urepo: urepo, rfrepo: rfrepo}
+}
+
+type Hasher interface {
+	HashPassword(password string) (string, error)
+	CheckPassword(password, hash string) error
+}
+
+type TokenManager interface {
+	NewToken(userID uuid.UUID, role models.Role, premium models.PremiumType) (string, error)
+	NewRefreshToken() (string, error)
+	RefreshTTL() time.Duration
+}
+
+type UserRepository interface {
+	RegisterNewUser(ctx context.Context, user *models.User) (uuid.UUID, error)
+	GetUserPublic(ctx context.Context, id uuid.UUID) (*models.UserPublic, error)
+	GetUserPrivate(ctx context.Context, id uuid.UUID) (*models.UserPrivate, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	DeleteUser(ctx context.Context, id uuid.UUID) (bool, error)
+	GetRole(ctx context.Context, id uuid.UUID) (models.Role, error)
+	UpdateUserRole(ctx context.Context, id uuid.UUID, role models.Role) (updated bool, err error)
+	UpdateUserPremium(ctx context.Context, id uuid.UUID, premium models.PremiumType) (updated bool, err error)
+	GetPasswordHash(ctx context.Context, id uuid.UUID) (string, error)
+	ChangePassword(ctx context.Context, id uuid.UUID, newPasswordHash string) (updated bool, err error)
+	UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.UserPrivate, error)
+	BanUser(ctx context.Context, id uuid.UUID) (updated bool, err error)
+	UnbanUser(ctx context.Context, id uuid.UUID) (updated bool, err error)
+}
+
+type RefreshRepository interface {
+	SetRefreshToken(ctx context.Context, tokenHash, userID string, ttl time.Duration) error
+	DeleteRefreshToken(ctx context.Context, tokenHash string) error
+	RotateRefreshToken(ctx context.Context, oldTokenHash, newTokenHash string, ttl time.Duration) (string, error)
+	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
+}
+=== FILE: ./auth-service/internal/service/user.go ===
+package service
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+)
+
+// password validate: if err == bcrypt.ErrPasswordTooLong (>72byte),
+
+// Register
+func (s *UserService) Register(ctx context.Context, name, email, password string) (uuid.UUID, error) {
+	const op = "service.User.Register"
+
+	if err := validateName(name); err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+	}
+	if err := validateEmail(email); err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+	}
+	if err := validatePassword(password); err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	passwordHash, err := s.h.HashPassword(password)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	id, err := s.urepo.RegisterNewUser(ctx, &models.User{
+		Name:         name,
+		Email:        email,
+		PasswordHash: passwordHash,
+	})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return id, nil
+
+}
+
+func (s *UserService) BanUser(ctx context.Context, id uuid.UUID, SenderRole models.Role) (bool, error) {
+	const op = "service.User.BanUser"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if SenderRole.Weight() < models.AdminRole.Weight() {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+	currentRole, err := s.urepo.GetRole(ctx, id) // get target user role
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if currentRole > models.ModeratorRole {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+	updated, err := s.urepo.BanUser(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return true, fmt.Errorf("%s: %w", op, err)
+	}
+	return updated, nil
+}
+
+func (s *UserService) UnbanUser(ctx context.Context, id uuid.UUID, SenderRole models.Role) (bool, error) {
+	const op = "service.User.UnbanUser"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if SenderRole.Weight() < models.AdminRole.Weight() {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+	currentRole, err := s.urepo.GetRole(ctx, id) // get target user role
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if currentRole != models.BannedRole {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+
+	updated, err := s.urepo.UnbanUser(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	return updated, nil
+}
+
+// GetUser returns user PUBLIC PROFILE
+func (s *UserService) GetUser(ctx context.Context, id uuid.UUID) (*models.UserPublic, error) {
+	const op = "service.User.GetUserPublic"
+	if err := validateID(id); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	u, err := s.urepo.GetUserPublic(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return u, nil
+}
+
+// GetMe returns user PRIVATE PROFILE
+func (s *UserService) GetMe(ctx context.Context, targetID uuid.UUID, myID uuid.UUID) (*models.UserPrivate, error) {
+	const op = "service.User.GetUserPrivate"
+	if err := validateID(targetID); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	if targetID != myID {
+		return nil, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+	
+	u, err := s.urepo.GetUserPrivate(ctx, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return u, nil
+}
+
+
+// AdminGetUser returns user PRIVATE PROFILE
+func (s *UserService) AdminGetUser(ctx context.Context, id uuid.UUID, role models.Role) (*models.UserPrivate, error) {
+	const op = "service.User.AdminGetUser"
+	if err := validateID(id); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	if role != models.AdminRole && role != models.OwnerRole && role != models.ModeratorRole {
+		return nil, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+	u, err := s.urepo.GetUserPrivate(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return u, nil
+}
+
+// RoleUpdate. TargetRole - the role you want to switch to. SenderRole - your role. id - target user id.
+func (s *UserService) RoleUpdate(ctx context.Context, id uuid.UUID, TargetRole models.Role, SenderRole models.Role) (updated bool, err error) {
+	const op = "service.User.RoleUpdate"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if TargetRole == models.OwnerRole || TargetRole == models.RoleUnspecified || TargetRole == models.BillingRole ||
+		SenderRole == models.RoleUnspecified || SenderRole == models.BannedRole || SenderRole == models.UserRole ||
+		SenderRole == models.BillingRole {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+	if TargetRole == models.BannedRole {
+		return false, fmt.Errorf("%s: %w", op, errs.WrongMethod)
+	}
+
+	currentRole, err := s.urepo.GetRole(ctx, id) // get target user role
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	switch currentRole {
+	case models.OwnerRole:
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	case models.RoleUnspecified:
+		return false, fmt.Errorf("%s: %w", op, errs.ErrInternal)
+	case models.BannedRole:
+		return false, fmt.Errorf("%s: %w", op, errs.WrongMethod)
+	}
+
+	if SenderRole.Weight() <= currentRole.Weight() || SenderRole.Weight() <= TargetRole.Weight() { // тут исключается вариант самоповышения (senderRole == currentrole)
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+	updated, err = s.urepo.UpdateUserRole(ctx, id, TargetRole)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	return true, nil
+}
+
+// PremiumUpdate. Billing service is tho only who is able to call this method
+func (s *UserService) PremiumUpdate(ctx context.Context, id uuid.UUID, newPremium models.PremiumType, senderRole models.Role) (bool, error) {
+	const op = "service.User.PremiumUpdate"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if senderRole != models.BillingRole {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+
+	updated, err := s.urepo.UpdateUserPremium(ctx, id, newPremium)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	return true, nil
+}
+
+func (s *UserService) GetRole(ctx context.Context, id uuid.UUID) (models.Role, error) {
+	const op = "service.User.GetRole"
+	if err := validateID(id); err != nil {
+		return models.RoleUnspecified, fmt.Errorf("%s: %w", op, err)
+	}
+	role, err := s.urepo.GetRole(ctx, id)
+	if err != nil {
+		return models.RoleUnspecified, fmt.Errorf("%s: %w", op, err)
+	}
+	return role, nil
+}
+
+// DeleteUser. Only works if callerRole >= Admin || callerID == TargetID
+func (s *UserService) DeleteUser(ctx context.Context, id uuid.UUID, senderRole models.Role, senderID uuid.UUID) (bool, error) {
+	const op = "service.User.DeleteUser"
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if senderRole != models.AdminRole && senderRole != models.OwnerRole && id != senderID {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
+	}
+	deleted, err := s.urepo.DeleteUser(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !deleted {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return true, nil
+}
+
+func (s *UserService) UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.UserPrivate, error) {
+	const op = "service.User.UpdateUser"
+
+	if err := validateID(id); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if err := validateUserPatch(u); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	nu, err := s.urepo.UpdateUser(ctx, u, id)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	
+	
+	return nu, nil
+}
+
+func (s *UserService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassword, newPassword string) (bool, error) {
+	const op = "service.User.ChangePassword"
+
+	if err := validateID(id); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if err := validatePassword(newPassword); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	
+	oldHash, err := s.urepo.GetPasswordHash(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if err = s.h.CheckPassword(oldPassword, oldHash); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	newHash, err := s.h.HashPassword(newPassword)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	updated, err := s.urepo.ChangePassword(ctx, id, newHash)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	if !updated {
+		return false, fmt.Errorf("%s: %w", op, errs.ErrNoUpdates)
+	}
+	if err := s.rfrepo.RevokeAllUserRefreshTokens(ctx, id.String()); err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return true, nil
+}
+
+func validateAvatarURL(url string) error {
+	return nil
+}
+
+func validateBio(bio string) error {
+	return nil
+}
+func validateID(id uuid.UUID) error {
+	return nil
+}
+
+func validateName(name string) error {
+	return nil
+}
+
+func validateEmail(email string) error {
+	return nil
+}
+
+func validatePassword(password string) error {
+	// validatePassword: len > 72
+	return nil
+}
+
+func validateUserPatch(u *models.UserPatch) error {
+	if u == nil || (u.AvatarURL == nil && u.Bio == nil && u.Name == nil && u.Email == nil) {
+		return errs.ErrUserPatchEmpty
+	}
+	if u.AvatarURL != nil {
+		if err := validateAvatarURL(*u.AvatarURL); err != nil {
+			return err
+		}
+	}
+	if u.Bio != nil {
+		if err := validateBio(*u.Bio); err != nil {
+			return err
+		}
+	}
+	if u.Name != nil {
+		if err := validateName(*u.Name); err != nil {
+			return err
+		}
+	}
+	if u.Email != nil {
+		if err := validateEmail(*u.Email); err != nil {
+			return err
+		}
+	}
+	return nil
+}=== FILE: ./auth-service/internal/repository/user.go ===
+package repository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+)
+
+var psql = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+type PostgresRepository struct {
+	db *pgxpool.Pool
+}
+
+
+const userColumns = `id, name, email, role, premium, avatar_url, bio, created_at, updated_at`
+const userPublicColumns = `id, name, role, premium, avatar_url, bio, created_at, updated_at`
+
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
+	return &PostgresRepository{
+		db: db,
+	}
+}
+
+func (r *PostgresRepository) RegisterNewUser(ctx context.Context, user *models.User) (uuid.UUID, error) {
+	const op = "repo.Postgres.RegisterNewUser"
+
+	var id uuid.UUID
+	query :=
+		`
+	INSERT INTO users (name, email, password_hash, role, premium, avatar_url, bio)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	RETURNING id
+	`
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		user.Name,
+		user.Email,
+		user.PasswordHash,
+		user.Role,
+		user.Premium,
+		user.AvatarURL,
+		user.Bio,
+	).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			switch pgErr.ConstraintName {
+			case "users_email_key":
+				return uuid.Nil, fmt.Errorf("%s: %w", op, errs.ErrEmailAlreadyExists)
+			case "users_name_key":
+				return uuid.Nil, fmt.Errorf("%s: %w", op, errs.ErrNameAlreadyExists)
+			default:
+				// неизвестный unique-constraint
+				return uuid.Nil, fmt.Errorf("%s: %w", op, errs.ErrAlreadyExists)
+			}
+		}
+		return id, fmt.Errorf("%s: %w", op, err) // 00000000-0000-0000-0000-000000000000
+	}
+
+	return id, nil
+}
+
+// GetUserPublic gives user PUBLIC PROFILE
+func (r *PostgresRepository) GetUserPublic(ctx context.Context, id uuid.UUID) (*models.UserPublic, error) {
+	const op = "repo.Postgres.GetUserPublic"
+
+	var u models.UserPublic
+	query := fmt.Sprintf(`SELECT %s FROM users WHERE id = $1`, userPublicColumns)
+
+	err := r.scanInUPubliWwhereX(ctx, query, id, &u)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &u, nil
+}
+
+// GetUserPrivate gives user PRIVATE PROFILE
+func (r *PostgresRepository) GetUserPrivate(ctx context.Context, id uuid.UUID) (*models.UserPrivate, error) {
+	const op = "repo.Postgres.GetUserPrivate"
+
+	var u models.UserPrivate
+	query := fmt.Sprintf(`SELECT %s FROM users WHERE id = $1`, userColumns)
+
+	err := r.scanInUPrivateWhereX(ctx, query, id, &u)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &u, nil
+}
+
+// GetUserByEmail gives user PRIVATE PROFILE by email WITH PASSWORD
+func (r *PostgresRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	const op = "repo.Postgres.GetUserByEmail"
+
+	var u models.User
+	query := fmt.Sprintf(`SELECT %s, password_hash FROM users WHERE email = $1`, userColumns)
+	err := r.db.QueryRow(ctx, query, email).Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.Premium,
+		&u.AvatarURL, &u.Bio, &u.CreatedAt, &u.UpdatedAt, &u.PasswordHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &u, nil
+}
+
+func (r *PostgresRepository) DeleteUser(ctx context.Context, id uuid.UUID) (bool, error) {
+	const op = "repo.Postgres.DeleteUser"
+
+	tag, err := r.db.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (r *PostgresRepository) UpdateUserRole(ctx context.Context, id uuid.UUID, role models.Role) (updated bool, err error) {
+	const op = "repo.Postgres.UpdateUserRole"
+
+	tag, err := r.db.Exec(ctx, `UPDATE users SET role = $2, 
+	updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`, id, role)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (r *PostgresRepository) GetRole(ctx context.Context, id uuid.UUID) (models.Role, error) {
+	const op = "repo.Postgres.GetRole"
+
+	var role models.Role
+	err := r.db.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, id).Scan(&role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.RoleUnspecified, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return models.RoleUnspecified, fmt.Errorf("%s: %w", op, err)
+	}
+	return role, nil
+}
+func (r *PostgresRepository) UpdateUserPremium(ctx context.Context, id uuid.UUID, premium models.PremiumType) (updated bool, err error) {
+	const op = "repo.Postgres.UpdateUserPremium"
+
+	tag, err := r.db.Exec(ctx, `UPDATE users 
+	SET premium = $2, 
+	updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`, id, premium)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (r *PostgresRepository) BanUser(ctx context.Context, id uuid.UUID) (updated bool, err error) {
+	const op = "repo.Postgres.BanUser"
+
+	tag, err := r.db.Exec(ctx, `UPDATE users 
+	SET role = $2, 
+	updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`, id, models.BannedRole)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (r *PostgresRepository) UnbanUser(ctx context.Context, id uuid.UUID) (updated bool, err error) {
+	const op = "repo.Postgres.UnbanUser"
+
+	tag, err := r.db.Exec(ctx, `UPDATE users 
+	SET role = $2, 
+	updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`, id, models.UserRole)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// GetPasswordHash возвращает старый хеш пароля
+func (r *PostgresRepository) GetPasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
+	const op = "repo.Postgres.GetPasswordHash"
+
+	var hash string
+	err := r.db.QueryRow(ctx, `SELECT password_hash FROM users WHERE id = $1`, id).Scan(&hash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+	return hash, nil
+}
+
+func (r *PostgresRepository) ChangePassword(ctx context.Context, id uuid.UUID, newPasswordHash string) (updated bool, err error) {
+	const op = "repo.Postgres.ChangePassword"
+
+	tag, err := r.db.Exec(ctx,
+		`UPDATE users
+            SET password_hash = $2,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+		id, newPasswordHash,
+	)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.UserPrivate, error) {
+	const op = "repo.Postgres.UpdateUser"
+
+	b := psql.Update("users")
+
+	if u.Name != nil {
+		b = b.Set("name", *u.Name)
+	}
+	if u.Email != nil {
+		b = b.Set("email", *u.Email)
+	}
+	if u.AvatarURL != nil {
+		b = b.Set("avatar_url", *u.AvatarURL)
+	}
+	if u.Bio != nil {
+		b = b.Set("bio", *u.Bio)
+	}
+	b = b.Set("updated_at", sq.Expr("CURRENT_TIMESTAMP"))
+
+	b.Where(sq.Eq{"id": id})
+	b = b.Suffix(fmt.Sprintf(`RETURNING %s`, userColumns))
+
+	query, args, err := b.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	var nu models.UserPrivate
+	err = r.db.QueryRow(ctx, query, args...).Scan(
+		&nu.ID,
+		&nu.Name,
+		&nu.Email,
+		&nu.Role,
+		&nu.Premium,
+		&nu.AvatarURL,
+		&nu.Bio,
+		&nu.CreatedAt,
+		&nu.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			switch pgErr.ConstraintName {
+			case "users_email_key":
+				return nil, fmt.Errorf("%s: %w", op, errs.ErrEmailAlreadyExists)
+			case "users_name_key":
+				return nil, fmt.Errorf("%s: %w", op, errs.ErrNameAlreadyExists)
+			default:
+				// неизвестный unique-constraint
+				return nil, fmt.Errorf("%s: %w", op, errs.ErrAlreadyExists)
+			}
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &nu, nil
+
+}
+
+
+func (r *PostgresRepository) scanInUPubliWwhereX(ctx context.Context, query string, x any, u *models.UserPublic) error {
+	err := r.db.QueryRow(ctx, query, x).Scan(
+		&u.ID,
+		&u.Name,
+		&u.Role,
+		&u.Premium,
+		&u.AvatarURL,
+		&u.Bio,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	return err
+}
+
+func (r *PostgresRepository) scanInUPrivateWhereX(ctx context.Context, query string, x any, u *models.UserPrivate) error {
+	err := r.db.QueryRow(ctx, query, x).Scan(
+		&u.ID,
+		&u.Name,
+		&u.Email,
+		&u.Role,
+		&u.Premium,
+		&u.AvatarURL,
+		&u.Bio,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	return err
+}=== FILE: ./auth-service/internal/repository/refresh.go ===
+
+package repository
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"time"
+
+	"github.com/monstrong/gracker2/pkg/errs"
+	"github.com/redis/go-redis/v9"
+)
+
+const userRefreshTokensPrefix = "user-refresh-tokens:"
+const refreshPrefix = "refresh:"
+
+type RedisRepository struct {
+	c redis.UniversalClient
+}
+func NewRedisRepository(c redis.UniversalClient) *RedisRepository {
+	return &RedisRepository{
+		c: c,
+	}
+}
+// redis выглядит так:
+// refresh:hash_A             → "123"
+// refresh:hash_B             → "123"
+
+// user-refresh-tokens:123    → Set{"hash_A", "hash_B"}
+
+// стоит помнить что в SET могут лежать ключи ныне не существующие. нет их автоматического удаления когда сам ключ refresh:hash_A сгорает
+// Поскольку при ротации продлевается TTL множества, оно может продолжать существовать очень долго, а устаревшие хеши будут занимать память
+// Однако при revokeAllRefreshTokens они удалятся. по истечении ttl самого множества,
+// то есть когда пользователь вообще не будет заходить в аккаунт на протяжении месяца ни с одного устройства.
+// возможное РЕШЕНИЕ - периодический проход по всей бд и удаление устаревших хэшей из set'ов. 
+
+// При Redis Cluster важно глобально пересмотреть логику работы, так как скрипт берет сразу два ключа, а они могут храниться в разных частях
+
+func refreshKey(tokenHash string) string {
+	return refreshPrefix + tokenHash
+}
+
+func userRefreshTokensKey(userID string) string {
+	return userRefreshTokensPrefix + userID
+}
+
+var deleteRefreshScript = redis.NewScript(`
+	local tokenKey = KEYS[1]
+	local userRefreshTokensPrefix = ARGV[1]
+	local tokenHash = ARGV[2]
+
+	local userID = redis.call("GET", tokenKey)
+
+	if userID then
+		local sessionsKey = userRefreshTokensPrefix .. userID
+		redis.call("SREM", sessionsKey, tokenHash)
+	end
+
+	redis.call("DEL", tokenKey)
+
+	return 1
+`)
+
+var rotateRefreshScript = redis.NewScript(`
+	local oldTokenKey = KEYS[1]
+	local newTokenKey = KEYS[2]
+
+	local ttlSeconds = tonumber(ARGV[1])
+	local userRefreshTokensPrefix = ARGV[2]
+	local oldTokenHash = ARGV[3]
+	local newTokenHash = ARGV[4]
+
+	local userID = redis.call("GET", oldTokenKey)
+
+	if not userID then
+		return ""
+	end
+
+	redis.call("SET", newTokenKey, userID, "EX", ttlSeconds)
+
+	local sessionsKey = userRefreshTokensPrefix .. userID
+
+	redis.call("SREM", sessionsKey, oldTokenHash)
+	redis.call("SADD", sessionsKey, newTokenHash)
+	redis.call("EXPIRE", sessionsKey, ttlSeconds)
+
+	redis.call("DEL", oldTokenKey)
+
+	return userID
+`)
+
+var revokeAllRefreshTokensScript = redis.NewScript(`
+	local sessionsKey = KEYS[1]
+	local refreshPrefix = ARGV[1]
+
+	local hashes = redis.call("SMEMBERS", sessionsKey)
+
+	for _, hash in ipairs(hashes) do
+		redis.call("DEL", refreshPrefix .. hash)
+	end
+
+	redis.call("DEL", sessionsKey)
+
+	return #hashes
+`)
+
+func (r *RedisRepository) SetRefreshToken(
+	ctx context.Context,
+	tokenHash string,
+	userID string,
+	ttl time.Duration,
+) error {
+	const op = "repo.Redis.SetRefreshToken"
+
+	if ttl <= 0 {
+		return fmt.Errorf("%s: ttl must be positive", op)
+	}
+
+	_, err := r.c.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Set(ctx, refreshKey(tokenHash), userID, ttl)
+
+		sessionsKey := userRefreshTokensKey(userID)
+		pipe.SAdd(ctx, sessionsKey, tokenHash)
+		pipe.Expire(ctx, sessionsKey, ttl)
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (r *RedisRepository) DeleteRefreshToken(
+	ctx context.Context,
+	tokenHash string,
+) error {
+	const op = "repo.Redis.DeleteRefreshToken"
+
+	err := deleteRefreshScript.Run(
+		ctx,
+		r.c,
+		[]string{refreshKey(tokenHash)},
+		userRefreshTokensPrefix,
+		tokenHash,
+	).Err()
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (r *RedisRepository) RotateRefreshToken(
+	ctx context.Context,
+	oldTokenHash string,
+	newTokenHash string,
+	ttl time.Duration,
+) (string, error) {
+	const op = "repo.Redis.RotateRefreshToken"
+
+	if ttl <= 0 {
+		return "", fmt.Errorf("%s: ttl must be positive", op)
+	}
+
+	ttlSeconds := int64(math.Ceil(ttl.Seconds()))
+
+	userID, err := rotateRefreshScript.Run(
+		ctx,
+		r.c,
+		[]string{
+			refreshKey(oldTokenHash),
+			refreshKey(newTokenHash),
+		},
+		ttlSeconds,
+		userRefreshTokensPrefix,
+		oldTokenHash,
+		newTokenHash,
+	).Text()
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	if userID == "" {
+		return "", fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+	}
+
+	return userID, nil
+}
+
+func (r *RedisRepository) RevokeAllUserRefreshTokens(
+	ctx context.Context,
+	userID string,
+) error {
+	const op = "repo.Redis.RevokeAllUserRefreshTokens"
+
+	err := revokeAllRefreshTokensScript.Run(
+		ctx,
+		r.c,
+		[]string{userRefreshTokensKey(userID)},
+		refreshPrefix,
+	).Err()
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+=== FILE: ./auth-service/internal/transport/grpc/infrastructure.go ===
+package grpc
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
+)
+
+type Server struct {
+	pb.UnimplementedAuthServiceServer
+	s Service
+}
+
+func NewServer(s Service) *Server{
+	return &Server{s: s}
+}
+
+type Service interface {
+	Register(ctx context.Context, name, email, password string) (uuid.UUID, error)
+	BanUser(ctx context.Context, id uuid.UUID, SenderRole models.Role) (bool, error)
+	UnbanUser(ctx context.Context, id uuid.UUID, SenderRole models.Role) (bool, error)
+	GetUser(ctx context.Context, id uuid.UUID) (*models.UserPublic, error)
+	GetMe(ctx context.Context, targetID uuid.UUID, myID uuid.UUID) (*models.UserPrivate, error)
+	AdminGetUser(ctx context.Context, id uuid.UUID, role models.Role) (*models.UserPrivate, error)
+	RoleUpdate(ctx context.Context, id uuid.UUID, TargetRole models.Role, SenderRole models.Role) (updated bool, err error)
+	PremiumUpdate(ctx context.Context, id uuid.UUID, newPremium models.PremiumType, senderRole models.Role) (bool, error)
+	GetRole(ctx context.Context, id uuid.UUID) (models.Role, error)
+	DeleteUser(ctx context.Context, id uuid.UUID, senderRole models.Role, senderID uuid.UUID) (bool, error)
+	UpdateUser(ctx context.Context, u *models.UserPatch, id uuid.UUID) (*models.UserPrivate, error)
+	ChangePassword(ctx context.Context, id uuid.UUID, oldPassword, newPassword string) (bool, error)
+	
+	Login(ctx context.Context, email, password string) (access, refresh string, err error)
+	Logout(ctx context.Context, rawRefresh string) (bool, error)
+	LogoutEverywhere(ctx context.Context, id uuid.UUID) (bool, error)
+	Refresh(ctx context.Context, rawRefresh string) (access, newRefresh string, err error)
+
+}
+
+=== FILE: ./auth-service/internal/transport/grpc/grpc.go ===
+package grpc
+
+import (
+	"context"
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/errs"
+	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const UserIDKey = "x-user-id"
+const SenderRoleKey = "x-sender-role"
+
+func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+	id, err := s.s.Register(ctx, in.GetName(), in.GetEmail(), in.GetPassword())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.RegisterResponse{Id: id.String()}, nil
+}
+
+func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginResponse, error) {
+	access, refresh, err := s.s.Login(ctx, in.GetEmail(), in.GetPassword())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.LoginResponse{AccessToken: access, RefreshToken: refresh}, nil
+}
+
+func (s *Server) Refresh(ctx context.Context, in *pb.RefreshRequest) (*pb.RefreshResponse, error) {
+	access, refresh, err := s.s.Refresh(ctx, in.GetRefreshToken())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.RefreshResponse{AccessToken: access, RefreshToken: refresh}, nil
+}
+
+func (s *Server) Logout(ctx context.Context, in *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+
+	loggedOut, err := s.s.Logout(ctx, in.GetRefreshToken())
+	if err != nil {
+		return nil, err
+	}
+
+	if !loggedOut {
+		// already logged out. можно какую-нибудь ошибку возвращать
+		return &pb.LogoutResponse{}, nil
+	}
+
+	return &pb.LogoutResponse{}, nil
+}
+
+// LogoutEverywhere wants UserID in metadata
+func (s *Server) LogoutEverywhere(ctx context.Context, in *pb.LogoutEverywhereRequest) (*pb.LogoutEverywhereResponse, error) {
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	userID, err := checkIDfromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	loggedOut, err := s.s.LogoutEverywhere(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !loggedOut {
+		// already logged out. можно какую-нибудь ошибку возвращать
+		return &pb.LogoutEverywhereResponse{}, nil
+	}
+
+	return &pb.LogoutEverywhereResponse{}, nil
+}
+
+// RoleUpdate wants SenderRole in metadata
+func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.RoleUpdateResponse, error) {
+	id, err := uuid.Parse(in.GetTargetUserId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	SenderRole, err := checkSenderRolefromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := s.s.RoleUpdate(ctx, id, models.Role(in.GetNewRole()), SenderRole)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.RoleUpdateResponse{Updated: updated}, nil
+}
+
+// PremiumUpdate wants SenderRole in metadata
+func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest) (*pb.PremiumUpdateResponse, error) {
+	id, err := uuid.Parse(in.GetTargetUserId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	SenderRole, err := checkSenderRolefromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := s.s.PremiumUpdate(ctx, id, models.PremiumType(in.GetNewPremium()), SenderRole)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.PremiumUpdateResponse{Updated: updated}, nil
+}
+
+// GetMe wants UserID in metadata
+func (s *Server) GetMe(ctx context.Context, in *pb.GetMeRequest) (*pb.GetMeResponse, error) {
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	id, err := checkIDfromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.s.GetMe(ctx, id, id)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetMeResponse{User: userPrivateToPb(user)}, nil
+}
+
+func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUserResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+	user, err := s.s.GetUser(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetUserResponse{User: userPublicToPb(user)}, nil
+}
+
+// AdminGetUser wants SenderRole in metadata
+func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (*pb.AdminGetUserResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	SenderRole, err := checkSenderRolefromMD(MD) 
+	user, err := s.s.AdminGetUser(ctx, id, SenderRole)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.AdminGetUserResponse{User: userPrivateToPb(user)}, nil
+}
+
+// UpdateUser wants SenderID in metadata
+func (s *Server) UpdateUser(ctx context.Context, in *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	userID, err := checkIDfromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	patch := &models.UserPatch{
+		Name:      in.Name,
+		Email:     in.Email,
+		AvatarURL: in.AvatarUrl,
+		Bio:       in.Bio,
+	}
+
+	user, err := s.s.UpdateUser(ctx, patch, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.UpdateUserResponse{User: userPrivateToPb(user)}, nil
+}
+
+// DeleteUser wants SenderRole AND SenderID in metadata
+func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	SenderRole, err := checkSenderRolefromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+	SenderID, err := checkIDfromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	deleted, err := s.s.DeleteUser(ctx, id, SenderRole, SenderID)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &pb.DeleteUserResponse{Deleted: deleted}, nil
+}
+
+// BanUser wants SenderRole in metadata
+func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUserResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	SenderRole, err := checkSenderRolefromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	banned, err := s.s.BanUser(ctx, id, SenderRole)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.BanUserResponse{Banned: banned}, nil
+}
+
+// UnBanUser wants SenderRole in metadata
+func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.UnBanUserResponse, error) {
+	id, err := uuid.Parse(in.GetId())
+	if err != nil {
+		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+	}
+
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	SenderRole, err := checkSenderRolefromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+
+	unbanned, err := s.s.UnbanUser(ctx, id, SenderRole)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.UnBanUserResponse{Unbanned: unbanned}, nil
+}
+
+// ChangePassword wants UserID in metadata
+func (s *Server) ChangePassword(ctx context.Context, in *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+	
+	MD, _ := metadata.FromIncomingContext(ctx)
+
+	userID, err := checkIDfromMD(MD)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := s.s.ChangePassword(ctx, userID, in.GetOldPassword(), in.GetNewPassword())
+	if err != nil {
+		return nil, err
+	}
+	return &pb.ChangePasswordResponse{Updated: updated}, nil
+}
+
+func checkIDfromMD(MD metadata.MD) (userID uuid.UUID, err error) {
+	vals := MD.Get(UserIDKey)
+
+	if len(vals) > 0 {
+		if userID, err = uuid.Parse(vals[0]); err != nil {
+			return uuid.Nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		}
+	} else {
+		return uuid.Nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "empty user id"}
+	}
+
+	return
+}
+
+func checkSenderRolefromMD(MD metadata.MD) (SenderRole models.Role, err error) {
+	vals := MD.Get(SenderRoleKey)
+
+	if len(vals) > 0 {
+		roleValue, err := strconv.ParseInt(vals[0], 10, 8)
+		if err != nil {
+			return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: SenderRoleKey, Reason: "invalid role format"}
+		}
+		SenderRole = models.Role(roleValue)
+	} else {
+		return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: SenderRoleKey, Reason: "empty role"}
+	}
+
+	return
+}
+
+func userPrivateToPb(user *models.UserPrivate) *pb.User {
+	return &pb.User{
+		Id:      user.ID.String(),
+		Name:    user.Name,
+		Email:   user.Email,
+		Role:    pb.Role(user.Role),
+		Premium: pb.Premium(user.Premium),
+		AvatarUrl: user.AvatarURL,
+		Bio:       user.Bio,
+		CreatedAt: timestamppb.New(user.CreatedAt),
+		UpdatedAt: timestamppb.New(user.UpdatedAt),
+	}
+}
+
+func userPublicToPb(user *models.UserPublic) *pb.PublicUser {
+	return &pb.PublicUser{
+		Id:      user.ID.String(),
+		Name:    user.Name,
+		Role:    pb.Role(user.Role),
+		Premium: pb.Premium(user.Premium),
+		AvatarUrl: user.AvatarURL,
+		Bio:       user.Bio,
+		CreatedAt: timestamppb.New(user.CreatedAt),
+		UpdatedAt: timestamppb.New(user.UpdatedAt),
+	}
+}
+
+=== FILE: ./auth-service/internal/authconfig/config.go ===
+package authconfig
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/monstrong/gracker2/pkg/config"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type Config struct {
+	config.Config `mapstructure:",squash"`
+
+	JWT    JWT    `mapstructure:"jwt" yaml:"jwt"`
+	Hasher Hasher `mapstructure:"hasher" yaml:"hasher"`
+	Redis  Redis  `mapstructure:"redis" yaml:"redis"`
+}
+
+type JWT struct {
+	AccessTokenTTL  time.Duration `mapstructure:"access_token_ttl" yaml:"access_token_ttl"`
+	RefreshTokenTTL time.Duration `mapstructure:"refresh_token_ttl" yaml:"refresh_token_ttl"`
+	SigningKey      string
+}
+
+type Redis struct {
+    Addr         string        `mapstructure:"addr"`
+    Password     string        
+    DB           int           `mapstructure:"db"`
+    DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+    ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+    WriteTimeout time.Duration `mapstructure:"write_timeout"`
+}
+
+type Hasher struct {
+	Cost int `mapstructure:"cost" yaml:"cost"`
+}
+
+const secretKey = "JWT_SECRET"
+const postgresPasswordKey = "POSTGRES_PASSWORD"
+const redisPasswordKey = "REDIS_PASSWORD"
+
+func Load() (*Config, error) {
+	cfg := &Config{}
+
+	if err := config.LoadInto(cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.Postgres.Password = os.Getenv(postgresPasswordKey)
+	cfg.JWT.SigningKey = os.Getenv(secretKey)
+	cfg.Redis.Password = os.Getenv(redisPasswordKey)
+
+	if err := config.Validate(&cfg.Config); err != nil {
+		return nil, err
+	}
+
+	if cfg.JWT.SigningKey == "" {
+		return nil, fmt.Errorf("empty JWT secret")
+	}
+	if cfg.JWT.AccessTokenTTL <= 0 {
+		return nil, fmt.Errorf("invalid access token TTL")
+	}
+	if cfg.JWT.RefreshTokenTTL <= 0 {
+		return nil, fmt.Errorf("invalid refresh token TTL")
+	}
+	
+	if cfg.Hasher.Cost < bcrypt.MinCost ||
+		cfg.Hasher.Cost > bcrypt.MaxCost {
+		return nil, fmt.Errorf("invalid bcrypt cost: %d", cfg.Hasher.Cost)
+	}
+
+	return cfg, nil
+}
+=== FILE: ./auth-service/internal/models/models.go ===
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/domain"
+)
+
+type User struct {
+	ID           uuid.UUID   `db:"id"`
+	Name         string      `db:"name"`
+	Email        string      `db:"email"`
+	PasswordHash string      `db:"password_hash"`
+	Role         Role        `db:"role"`
+	Premium      PremiumType `db:"premium"`
+
+	AvatarURL string `db:"avatar_url"` // "" = нет аватарки
+	Bio       string `db:"bio"`        // "" = нет описания
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type UserPublic struct {
+	ID      uuid.UUID   `db:"id"`
+	Name    string      `db:"name"`
+	Role    Role        `db:"role"`
+	Premium PremiumType `db:"premium"`
+
+	AvatarURL string `db:"avatar_url"` // "" = нет аватарки
+	Bio       string `db:"bio"`        // "" = нет описания
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type UserPrivate struct {
+	ID      uuid.UUID   `db:"id"`
+	Name    string      `db:"name"`
+	Email   string      `db:"email"`
+	Role    Role        `db:"role"`
+	Premium PremiumType `db:"premium"`
+
+	AvatarURL string `db:"avatar_url"` // "" = нет аватарки
+	Bio       string `db:"bio"`        // "" = нет описания
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+type UserPatch struct {
+	Name      *string `json:"name"`
+	Email     *string `json:"email"`
+	AvatarURL *string `json:"avatar_url"`
+	Bio       *string `json:"bio"`
+}
+
+const PrivateFieldsMessageString = "NO_INFO"
+
+type Role = domain.Role
+
+const (
+	RoleUnspecified Role = domain.RoleUnspecified
+	UserRole        Role = domain.UserRole
+	BannedRole      Role = domain.BannedRole
+	ModeratorRole   Role = domain.ModeratorRole
+	AdminRole       Role = domain.AdminRole
+	OwnerRole       Role = domain.OwnerRole
+	BillingRole     Role = domain.BillingRole
+)
+
+type PremiumType = domain.PremiumType
+
+const (
+	PremiumUnspecified PremiumType = domain.PremiumUnspecified
+	Free               PremiumType = domain.Free
+	Premium            PremiumType = domain.Premium
+)
+=== FILE: ./auth-service/Makefile ===
+include config/.env
+export
+
+.PHONY: migrate-up migrate-down migrate-step migrate-step-down run
+
+migrate-up:
+	go run ./cmd/migrate up
+
+migrate-down:
+	go run ./cmd/migrate down
+
+migrate-step:
+	go run ./cmd/migrate step 1
+
+migrate-step-down:
+	go run ./cmd/migrate step -1
+
+run:
+	go run ./cmd/server
