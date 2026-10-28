@@ -58,7 +58,9 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 				errors.Is(err, errs.ErrUserPatchEmpty),
 				errors.Is(err, errs.ErrPermissionDenied),
 				errors.Is(err, errs.ErrNoUpdates),
-				errors.Is(err, errs.ErrPasswordMismatch):
+				errors.Is(err, errs.ErrPasswordMismatch),
+				errors.Is(err, errs.WrongMethod),
+				errors.Is(err, errs.BannedUser):
 				
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			case errors.Is(err, context.DeadlineExceeded),
@@ -115,10 +117,16 @@ func toGRPCError(err error) error {
 		return status.Error(codes.PermissionDenied, errs.ErrPermissionDenied.Error())
 	}
 	if errors.Is(err, errs.ErrPasswordMismatch) {
-		return status.Error(codes.PermissionDenied, errs.ErrPasswordMismatch.Error())
+		return status.Error(codes.Unauthenticated, errs.ErrPasswordMismatch.Error())
+	}
+	if errors.Is(err, errs.WrongMethod) {
+		return status.Error(codes.InvalidArgument, errs.WrongMethod.Error())
+	}
+	if errors.Is(err, errs.BannedUser) {
+		return status.Error(codes.PermissionDenied, errs.BannedUser.Error())
 	}
 	if errors.Is(err, errs.ErrNoUpdates) {
-		return nil
+		return nil // TODO: ченибудь придумать
 	}
 	return status.Error(codes.Internal, errs.ErrInternal.Error())
 }

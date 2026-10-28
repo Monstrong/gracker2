@@ -8,6 +8,7 @@ service AuthService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Refresh(RefreshRequest) returns (RefreshResponse);
   rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc LogoutEverywhere(LogoutEverywhereRequest) returns (LogoutEverywhereResponse);
   // rpc Validate(ValidateRequest) returns (ValidateResponse); - ПЕРЕНОС В API-GATEWAY
 
   rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
@@ -21,6 +22,8 @@ service AuthService {
 
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc BanUser(BanUserRequest) returns (BanUserResponse);
+  rpc UnBanUser(UnBanUserRequest) returns (UnBanUserResponse);
   
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
 }
@@ -101,6 +104,16 @@ message ChangePasswordResponse { bool updated = 1; }
 
 message LogoutRequest {}
 message LogoutResponse {}
+
+message LogoutEverywhereRequest {}
+message LogoutEverywhereResponse {}
+
+message BanUserRequest { string id = 1; }
+message BanUserResponse { bool banned = 1; }
+
+message UnBanUserRequest { string id = 1; }
+
+message UnBanUserResponse { bool unbanned = 1; }
 
 message PublicUser {
   string  id         = 1;

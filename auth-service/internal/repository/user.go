@@ -176,6 +176,32 @@ func (r *PostgresRepository) UpdateUserPremium(ctx context.Context, id uuid.UUID
 	return tag.RowsAffected() == 1, nil
 }
 
+func (r *PostgresRepository) BanUser(ctx context.Context, id uuid.UUID) (updated bool, err error) {
+	const op = "repo.Postgres.BanUser"
+
+	tag, err := r.db.Exec(ctx, `UPDATE users 
+	SET role = $2, 
+	updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`, id, models.BannedRole)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (r *PostgresRepository) UnbanUser(ctx context.Context, id uuid.UUID) (updated bool, err error) {
+	const op = "repo.Postgres.UnbanUser"
+
+	tag, err := r.db.Exec(ctx, `UPDATE users 
+	SET role = $2, 
+	updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`, id, models.UserRole)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // GetPasswordHash возвращает старый хеш пароля
 func (r *PostgresRepository) GetPasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
 	const op = "repo.Postgres.GetPasswordHash"

@@ -13,6 +13,8 @@ var (
 	ErrUserPatchEmpty     = errors.New("user patch is empty")
 	ErrPasswordMismatch   = errors.New("password mismatch")
 	ErrNoUpdates          = errors.New("no updates")
+	WrongMethod           = errors.New("wrong method")
+	BannedUser            = errors.New("user is banned")
 )
 
 // insted of ErrInvalidData
