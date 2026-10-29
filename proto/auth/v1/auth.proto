@@ -64,7 +64,8 @@ message RoleUpdateRequest {
   Role new_role = 2;
 }
 
-message PremiumUpdateResponse {  bool updated = 1; }
+
+message PremiumUpdateResponse {  bool updated = 1; }  // caller must check updated
 
 message PremiumUpdateRequest {
   string target_user_id = 1;

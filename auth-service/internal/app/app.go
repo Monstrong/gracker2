@@ -74,7 +74,7 @@ func New(ctx context.Context) (*App, error) {
 		))
 	pb.RegisterAuthServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(pool, rclient, cfg.Infra.Port, l)
+	httpServer := infraServerInit(pool, rclient, &cfg.Infra, l)
 
 	return &App{
 		cfg:        cfg,

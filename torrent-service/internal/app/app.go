@@ -59,7 +59,7 @@ func New(ctx context.Context) (*App, error) {
 		))
 	pb.RegisterTorrentServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(pool, cfg.Infra.Port, l)
+	httpServer := infraServerInit(pool, &cfg.Infra, l)
 
 	return &App{
 		cfg:        cfg,
