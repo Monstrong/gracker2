@@ -12,9 +12,9 @@ var (
 	ErrPermissionDenied   = errors.New("permission denied")
 	ErrUserPatchEmpty     = errors.New("user patch is empty")
 	ErrPasswordMismatch   = errors.New("password mismatch")
-	ErrNoUpdates          = errors.New("no updates")
-	WrongMethod           = errors.New("wrong method")
-	BannedUser            = errors.New("user is banned")
+	ErrWrongMethod           = errors.New("wrong method")
+	ErrBannedUser            = errors.New("user is banned")
+
 )
 
 // insted of ErrInvalidData
@@ -23,6 +23,15 @@ type ValidationError struct {
 	Reason string
 }
 
+type GatewayWrongFieldError struct {
+	Field  string
+	Reason string
+}
+
 func (e *ValidationError) Error() string {
+	return e.Reason
+}
+
+func (e *GatewayWrongFieldError) Error() string {
 	return e.Reason
 }

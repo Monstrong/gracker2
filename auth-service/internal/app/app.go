@@ -12,10 +12,14 @@ import (
 	"github.com/monstrong/gracker2/auth-service/internal/repository"
 	"github.com/monstrong/gracker2/auth-service/internal/service"
 	transport "github.com/monstrong/gracker2/auth-service/internal/transport/grpc"
+	"github.com/monstrong/gracker2/auth-service/pkg/hasher"
+	"github.com/monstrong/gracker2/auth-service/pkg/jwtmanager"
+	"github.com/monstrong/gracker2/auth-service/pkg/redisclient"
 	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
 	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
@@ -24,6 +28,7 @@ type App struct {
 	cfg        *authconfig.Config
 	l          logger.Logger
 	pool       *pgxpool.Pool
+	rclient    *redis.Client
 	grpcServer *grpc.Server
 	httpServer *http.Server
 }
@@ -47,8 +52,18 @@ func New(ctx context.Context) (*App, error) {
 	}
 	l.Info(ctx, "db pool init complete")
 
-	repo := repository.NewPostgresRepository(pool)
-	svc := service.NewAuthService(repo)
+	rclient, err := redisclient.NewClient(ctx, &cfg.Redis)
+	if err != nil {
+		return nil, fmt.Errorf("create redis client: %w", err)
+	}
+	l.Info(ctx, "redis client init complete")
+
+	urepo := repository.NewPostgresRepository(pool)
+	rfrepo := repository.NewRedisRepository(rclient)
+	m := jwtmanager.NewManager(cfg.JWT.SigningKey, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL)
+	h := hasher.NewSimpleHasher(cfg.Hasher.Cost)
+	
+	svc := service.New(m, h, urepo, rfrepo)
 	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(
@@ -59,12 +74,13 @@ func New(ctx context.Context) (*App, error) {
 		))
 	pb.RegisterAuthServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(pool, cfg.Infra.Port, l)
+	httpServer := infraServerInit(pool, rclient, &cfg.Infra, l)
 
 	return &App{
 		cfg:        cfg,
 		l:          l,
 		pool:       pool,
+		rclient:    rclient,
 		grpcServer: grpcServer,
 		httpServer: httpServer,
 	}, nil
@@ -161,6 +177,7 @@ func (a *App) shutdown(ctx context.Context) error {
 
 func (a *App) Close() error {
 	a.pool.Close()
+	a.rclient.Close()
 
 	a.l.Sync()
 

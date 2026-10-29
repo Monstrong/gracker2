@@ -26,13 +26,18 @@ func (s *UserService) Login(ctx context.Context, email, password string) (access
 		}
 		return "", "", fmt.Errorf("%s: %w", op, err)
 	}
-	if u.Role == models.BannedRole {
-		return "", "", fmt.Errorf("%s: %w", op, errs.BannedUser)
-	}
-
 	if err = s.h.CheckPassword(password, u.PasswordHash); err != nil {
+		if errors.Is(err, errs.ErrPasswordMismatch) {
+			return "", "", fmt.Errorf("%s: %w", op, errs.ErrInvalidCredentials)
+		}
 		return "", "", fmt.Errorf("%s: %w", op, err)
 	}
+	if u.Role == models.BannedRole {
+		return "", "", fmt.Errorf("%s: %w", op, errs.ErrBannedUser)
+	}
+
+
+	
 
 	access, err = s.m.NewToken(u.ID, u.Role, u.Premium)
 	if err != nil {
@@ -95,21 +100,24 @@ func (s *UserService) Refresh(ctx context.Context, rawRefresh string) (access, n
 
     userID, err := uuid.Parse(userIDStr)
     if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
 
     u, err := s.urepo.GetUserPrivate(ctx, userID) // актуальные role/premium
     if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
 
 	if u.Role == models.BannedRole {
 		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
-		return "", "", fmt.Errorf("%s: %w", op, errs.BannedUser)
+		return "", "", fmt.Errorf("%s: %w", op, errs.ErrBannedUser)
 	}
 
     access, err = s.m.NewToken(u.ID, u.Role, u.Premium)
     if err != nil {
+		_ = s.rfrepo.DeleteRefreshToken(ctx, hashToken(newRaw))
         return "", "", fmt.Errorf("%s: %w", op, err)
     }
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/domain"
 	"github.com/monstrong/gracker2/pkg/jwtparser"
 )
 
@@ -27,7 +27,7 @@ func NewManager(signingKey string, accessTokenTTL time.Duration, refreshTokenTTL
 	}
 }
 
-func (m *Manager) NewToken(userID uuid.UUID, role models.Role, premium models.PremiumType) (string, error) {
+func (m *Manager) NewToken(userID uuid.UUID, role domain.Role, premium domain.PremiumType) (string, error) {
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		UserID:  userID,
 		Role:    role,

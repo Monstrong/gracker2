@@ -36,8 +36,8 @@ func (r *PostgresRepository) RegisterNewUser(ctx context.Context, user *models.U
 	var id uuid.UUID
 	query :=
 		`
-	INSERT INTO users (name, email, password_hash, role, premium, avatar_url, bio)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	INSERT INTO users (name, email, password_hash, avatar_url, bio)
+	VALUES ($1, $2, $3, $4, $5)
 	RETURNING id
 	`
 	err := r.db.QueryRow(
@@ -46,8 +46,6 @@ func (r *PostgresRepository) RegisterNewUser(ctx context.Context, user *models.U
 		user.Name,
 		user.Email,
 		user.PasswordHash,
-		user.Role,
-		user.Premium,
 		user.AvatarURL,
 		user.Bio,
 	).Scan(&id)
@@ -249,9 +247,9 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch
 	if u.Bio != nil {
 		b = b.Set("bio", *u.Bio)
 	}
-	b = b.Set("updated_at", sq.Expr("CURRENT_TIMESTAMP"))
 
-	b.Where(sq.Eq{"id": id})
+	b = b.Set("updated_at", sq.Expr("CURRENT_TIMESTAMP"))
+	b = b.Where(sq.Eq{"id": id})
 	b = b.Suffix(fmt.Sprintf(`RETURNING %s`, userColumns))
 
 	query, args, err := b.ToSql()

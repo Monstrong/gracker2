@@ -22,6 +22,10 @@ func NewPool(cfg *config.Postgres) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
+	if cfg.MaxConns > 0 {
+		poolCfg.MaxConns = int32(cfg.MaxConns)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 

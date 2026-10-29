@@ -57,10 +57,9 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 				errors.Is(err, errs.ErrEmailAlreadyExists),
 				errors.Is(err, errs.ErrUserPatchEmpty),
 				errors.Is(err, errs.ErrPermissionDenied),
-				errors.Is(err, errs.ErrNoUpdates),
 				errors.Is(err, errs.ErrPasswordMismatch),
-				errors.Is(err, errs.WrongMethod),
-				errors.Is(err, errs.BannedUser):
+				errors.Is(err, errs.ErrWrongMethod),
+				errors.Is(err, errs.ErrBannedUser):
 				
 				l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			case errors.Is(err, context.DeadlineExceeded),
@@ -68,6 +67,7 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 				l.Warn(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
 			default:
 				l.Error(ctx, info.FullMethod, logger.Duration(DurationKey, duration), logger.Error(err))
+				// GatewayWrongFieldError сюда же
 			}
 		} else {
 			l.Info(ctx, info.FullMethod, logger.Duration(DurationKey, duration))
@@ -88,7 +88,6 @@ func toGRPCError(err error) error {
 	if errors.As(err, &ve) {
 		return status.Error(codes.InvalidArgument, ve.Reason)
 	}
-
 	if errors.Is(err, context.DeadlineExceeded) {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
@@ -119,14 +118,12 @@ func toGRPCError(err error) error {
 	if errors.Is(err, errs.ErrPasswordMismatch) {
 		return status.Error(codes.Unauthenticated, errs.ErrPasswordMismatch.Error())
 	}
-	if errors.Is(err, errs.WrongMethod) {
-		return status.Error(codes.InvalidArgument, errs.WrongMethod.Error())
+	if errors.Is(err, errs.ErrWrongMethod) {
+		return status.Error(codes.InvalidArgument, errs.ErrWrongMethod.Error())
 	}
-	if errors.Is(err, errs.BannedUser) {
-		return status.Error(codes.PermissionDenied, errs.BannedUser.Error())
+	if errors.Is(err, errs.ErrBannedUser) {
+		return status.Error(codes.PermissionDenied, errs.ErrBannedUser.Error())
 	}
-	if errors.Is(err, errs.ErrNoUpdates) {
-		return nil // TODO: ченибудь придумать
-	}
-	return status.Error(codes.Internal, errs.ErrInternal.Error())
+	return status.Error(codes.Internal, errs.ErrInternal.Error())  
+	// GatewayWrongFieldError сюда же
 }

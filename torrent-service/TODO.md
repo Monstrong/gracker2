@@ -2,7 +2,6 @@
 2. реализовать List с любыми фильтрами и редактируемым ORDER BY
 3. Умный поиск
 
-4. тесты для toGRPCError (table-driven)
-5. задействовать infra timeout
-6. Трейсинг: OpenTelemetry вместо x-trace-id
-7. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)+++
+4. проверка ролей
+5. Трейсинг: OpenTelemetry вместо x-trace-id
+6. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)

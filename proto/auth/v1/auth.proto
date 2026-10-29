@@ -4,8 +4,8 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/monstrong/gracker2/proto/gen/go/auth/v1";
 
 service AuthService {
-  rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
   rpc Refresh(RefreshRequest) returns (RefreshResponse);
   rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc LogoutEverywhere(LogoutEverywhereRequest) returns (LogoutEverywhereResponse);
@@ -14,10 +14,8 @@ service AuthService {
   rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
   rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse);
 
-    
   rpc GetMe(GetMeRequest) returns (GetMeResponse); // Свой профиль 
   rpc GetUser(GetUserRequest) returns (GetUserResponse); // без email
-
   rpc AdminGetUser(AdminGetUserRequest) returns (AdminGetUserResponse); // админу понадобился email
 
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
@@ -66,7 +64,8 @@ message RoleUpdateRequest {
   Role new_role = 2;
 }
 
-message PremiumUpdateResponse {  bool updated = 1; }
+
+message PremiumUpdateResponse {  bool updated = 1; }  // caller must check updated
 
 message PremiumUpdateRequest {
   string target_user_id = 1;
@@ -102,7 +101,7 @@ message ChangePasswordRequest {
 
 message ChangePasswordResponse { bool updated = 1; }
 
-message LogoutRequest {}
+message LogoutRequest { string refresh_token = 1; }
 message LogoutResponse {}
 
 message LogoutEverywhereRequest {}
