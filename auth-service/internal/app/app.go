@@ -19,6 +19,7 @@ import (
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
 	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
@@ -27,6 +28,7 @@ type App struct {
 	cfg        *authconfig.Config
 	l          logger.Logger
 	pool       *pgxpool.Pool
+	rclient    *redis.Client
 	grpcServer *grpc.Server
 	httpServer *http.Server
 }
@@ -72,12 +74,13 @@ func New(ctx context.Context) (*App, error) {
 		))
 	pb.RegisterAuthServiceServer(grpcServer, handler)
 
-	httpServer := infraServerInit(pool, cfg.Infra.Port, l)
+	httpServer := infraServerInit(pool, rclient, cfg.Infra.Port, l)
 
 	return &App{
 		cfg:        cfg,
 		l:          l,
 		pool:       pool,
+		rclient:    rclient,
 		grpcServer: grpcServer,
 		httpServer: httpServer,
 	}, nil
@@ -174,6 +177,7 @@ func (a *App) shutdown(ctx context.Context) error {
 
 func (a *App) Close() error {
 	a.pool.Close()
+	a.rclient.Close()
 
 	a.l.Sync()
 

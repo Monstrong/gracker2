@@ -83,7 +83,7 @@ func (s *Server) LogoutEverywhere(ctx context.Context, in *pb.LogoutEverywhereRe
 func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.RoleUpdateResponse, error) {
 	id, err := uuid.Parse(in.GetTargetUserId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 	MD, _ := metadata.FromIncomingContext(ctx)
 
@@ -103,7 +103,7 @@ func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.
 func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest) (*pb.PremiumUpdateResponse, error) {
 	id, err := uuid.Parse(in.GetTargetUserId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 	MD, _ := metadata.FromIncomingContext(ctx)
 
@@ -138,7 +138,7 @@ func (s *Server) GetMe(ctx context.Context, in *pb.GetMeRequest) (*pb.GetMeRespo
 func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 	user, err := s.s.GetUser(ctx, id)
 	if err != nil {
@@ -151,12 +151,15 @@ func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUse
 func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (*pb.AdminGetUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
 
 	SenderRole, err := checkSenderRolefromMD(MD) 
+	if err != nil {
+		return nil, err
+	}
 	user, err := s.s.AdminGetUser(ctx, id, SenderRole)
 	if err != nil {
 		return nil, err
@@ -191,7 +194,7 @@ func (s *Server) UpdateUser(ctx context.Context, in *pb.UpdateUserRequest) (*pb.
 func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
@@ -217,7 +220,7 @@ func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.
 func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
@@ -238,7 +241,7 @@ func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUse
 func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.UnBanUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)

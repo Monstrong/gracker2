@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -62,6 +63,7 @@ func LoadInto(target any) error {
 		fmt.Println("no .env file found")
 	}
 
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
 	if err := v.Unmarshal(target); err != nil {

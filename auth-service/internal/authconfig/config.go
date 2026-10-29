@@ -58,6 +58,9 @@ func Load() (*Config, error) {
 	if cfg.JWT.SigningKey == "" {
 		return nil, fmt.Errorf("empty JWT secret")
 	}
+	if len(cfg.JWT.SigningKey) < 32 {
+		return nil, fmt.Errorf("invalid JWT secret length")
+	}
 	if cfg.JWT.AccessTokenTTL <= 0 {
 		return nil, fmt.Errorf("invalid access token TTL")
 	}

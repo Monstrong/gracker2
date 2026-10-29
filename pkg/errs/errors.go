@@ -12,9 +12,8 @@ var (
 	ErrPermissionDenied   = errors.New("permission denied")
 	ErrUserPatchEmpty     = errors.New("user patch is empty")
 	ErrPasswordMismatch   = errors.New("password mismatch")
-	ErrNoUpdates          = errors.New("no updates")
-	WrongMethod           = errors.New("wrong method")
-	BannedUser            = errors.New("user is banned")
+	ErrWrongMethod           = errors.New("wrong method")
+	ErrBannedUser            = errors.New("user is banned")
 
 )
 
