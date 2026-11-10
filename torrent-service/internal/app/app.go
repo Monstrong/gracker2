@@ -8,20 +8,20 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/gracker2/pkg/config"
 	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
 	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
 	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	"github.com/monstrong/gracker2/torrent-service/internal/torrentconfig"
 	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
 type App struct {
-	cfg        *config.Config
+	cfg        *torrentconfig.Config
 	l          logger.Logger
 	pool       *pgxpool.Pool
 	grpcServer *grpc.Server
@@ -29,7 +29,7 @@ type App struct {
 }
 
 func New(ctx context.Context) (*App, error) {
-	cfg, err := config.Load()
+	cfg, err := torrentconfig.Load()
 	if err != nil {
 		return nil, fmt.Errorf("init config: %w", err)
 	}

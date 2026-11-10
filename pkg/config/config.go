@@ -47,7 +47,6 @@ type Logger struct {
 
 const configYamlPath = "config/config.yaml"
 const configEnvPath = "config/.env"
-const postgresPasswordName = "POSTGRES_PASSWORD"
 
 
 // use it in your custom config struct
@@ -71,24 +70,6 @@ func LoadInto(target any) error {
 	}
 
 	return nil
-}
-
-// old func, better use LoadInto with your custom config struct
-// migrations or small services use this
-func Load() (*Config, error) { 
-	cfg := &Config{}
-
-	if err := LoadInto(cfg); err != nil {
-		return nil, err
-	}
-
-	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
-
-	if err := cfg.validate(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
 }
 
 // use it in your custom config struct

@@ -10,12 +10,13 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/monstrong/gracker2/pkg/config"
+
+	"github.com/monstrong/gracker2/auth-service/internal/authconfig"
 	"github.com/monstrong/gracker2/pkg/db"
 )
 
 func main() {
-	cfg, err := config.Load()
+	cfg, err := authconfig.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
