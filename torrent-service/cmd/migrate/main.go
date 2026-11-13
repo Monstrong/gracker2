@@ -10,12 +10,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/monstrong/gracker2/pkg/config"
 	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/torrent-service/internal/torrentconfig"
 )
 
 func main() {
-	cfg, err := config.Load()
+	cfg, err := torrentconfig.Load()
 	if err != nil {
 		log.Fatal(err)
 	}

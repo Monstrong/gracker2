@@ -1,0 +1,13 @@
+server:
+  name: api-gateway
+  port: 8082
+  timeout: 5s
+
+services:
+  auth_addr: "localhost:50052"
+  torrent_addr: "localhost:50051"
+
+logger:
+  level: local
+
+graceful_shutdown_timeout: 15s
