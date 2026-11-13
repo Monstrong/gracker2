@@ -15,11 +15,14 @@ import (
 const configYamlPath = "config/config.yaml"
 const configEnvPath = "config/.env"
 
+const secretKey = "JWT_SECRET"
+
 type Config struct {
 	Logger config.Logger `mapstructure:"logger" yaml:"logger"`
 
 	Services Services `mapstructure:"services" yaml:"services"`
 	Server Server `mapstructure:"server" yaml:"server"`
+	JWT_Secret string
 	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout" yaml:"graceful_shutdown_timeout"`
 }
 
@@ -53,6 +56,8 @@ func Load() (*Config, error) {
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}	
+	
+	cfg.JWT_Secret = os.Getenv(secretKey)
 	
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)

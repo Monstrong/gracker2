@@ -87,7 +87,7 @@ func New(ctx context.Context) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	logCtx := context.WithoutCancel(ctx)
+	logCtx := context.WithoutCancel(ctx) // контекст для логгера (останется после отмены основного через gracefulShutdown)
 
 	g, gctx := errgroup.WithContext(ctx)
 
