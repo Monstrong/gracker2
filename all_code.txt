@@ -340,15 +340,15 @@ import (
 	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // при смене версии сменить версию
 )
 
-type AuthClient struct {
+type AuthGrpcClient struct {
 	conn   *grpc.ClientConn
 	client authv1.AuthServiceClient
 }
 
-func (c *AuthClient) Close() error {
+func (c *AuthGrpcClient) Close() error {
 	return c.conn.Close()
 }
-func NewAuthClient(addr string) (*AuthClient, error) {
+func NewAuthClient(addr string) (*AuthGrpcClient, error) {
 
 	conn, err := grpc.NewClient(
 		addr,
@@ -362,17 +362,17 @@ func NewAuthClient(addr string) (*AuthClient, error) {
 
 	client := authv1.NewAuthServiceClient(conn)
 
-	return &AuthClient{conn: conn, client: client}, nil
+	return &AuthGrpcClient{conn: conn, client: client}, nil
 }
 
-func (c *AuthClient) Login(
+func (c *AuthGrpcClient) Login(
 	ctx context.Context,
 	req *authv1.LoginRequest,
 ) (*authv1.LoginResponse, error) {
 	return c.client.Login(ctx, req)
 }
 
-func (c *AuthClient) GetMe(
+func (c *AuthGrpcClient) GetMe(
 	ctx context.Context,
 	req *authv1.GetMeRequest,
 ) (*authv1.GetMeResponse, error) {
@@ -419,13 +419,13 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
-
-	"github.com/monstrong/gracker2/api-gateway/internal/clients"
+	
 	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
 	"github.com/monstrong/gracker2/api-gateway/internal/middleware"
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/dto"
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/mapper"
+	"github.com/monstrong/gracker2/pkg/contracts/grpcmetakey"
+	"github.com/monstrong/gracker2/pkg/logger"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -434,28 +434,36 @@ import (
 )
 
 type AuthHandler struct {
-    authClient clients.AuthClient
+    authClient AuthClient
 	cfg gatewayconfig.Auth
+	l logger.Logger
 }
 
-func NewAuthHandler(authClient clients.AuthClient, cfg gatewayconfig.Auth) *AuthHandler {
-	return &AuthHandler{authClient: authClient, cfg: cfg}
+
+func NewAuthHandler(authClient AuthClient, cfg gatewayconfig.Auth, l logger.Logger) *AuthHandler {
+	return &AuthHandler{authClient: authClient, cfg: cfg, l: l}
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req dto.LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	const op = "handlers.auth.Login"
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
 	defer cancel()
+
+	var req dto.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	
 
 	grpcReq := mapper.ToLoginGRPC(req)
 
     resp, err := h.authClient.Login(ctx, grpcReq)
     if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
         writeGRPCError(w, err)
         return
     }
@@ -463,36 +471,48 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
     httpResp := mapper.ToLoginHTTP(resp)
 
     if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
-		// TODO: log
+		h.l.Error(ctx, op, logger.Error(err))
 	}
 }
 
 func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetClaims(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
+	const op = "handlers.auth.GetMe"
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
 	defer cancel()
 
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	
+
 	ctx = metadata.AppendToOutgoingContext(
         ctx,
-        "x-user-id", claims.UserID.String(),
-        "x-sender-role", strconv.Itoa(int(claims.Role)),
+        grpcmetakey.GRPCMetaKeyUserID, claims.UserID.String(),
+        // grpcmetakey.GRPCMetaKeyRole, strconv.Itoa(int(claims.Role)),
+		// пример того как надо передавать роль
     )
 
 	resp, err := h.authClient.GetMe(ctx, &authv1.GetMeRequest{})
 	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
 		writeGRPCError(w, err)
 		return
 	}
 
-	httpResp := mapper.ToGetMeHTTP(resp)
+	httpResp, err := mapper.ToGetMeHTTP(resp)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
-		// TODO: log
+		h.l.Error(ctx, op, logger.Error(err))
 	}
 }
 
@@ -526,6 +546,19 @@ func writeGRPCError(w http.ResponseWriter, err error) {
     default:
         http.Error(w, "internal server error", http.StatusInternalServerError)
     }
+}=== FILE: ./api-gateway/internal/transport/httpapi/handlers/infrastructure.go ===
+package handlers
+
+import (
+	"context"
+	
+	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1"
+)
+
+
+type AuthClient interface {
+    Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error)
+    GetMe(ctx context.Context, req *authv1.GetMeRequest) (*authv1.GetMeResponse, error)
 }=== FILE: ./api-gateway/internal/transport/httpapi/dto/auth.go ===
 package dto
 
@@ -566,7 +599,7 @@ type RefreshResponse struct {
 }
 
 type RoleUpdateRequest struct {
-	TargetUserId string      `json:"target_user_id"`
+	TargetUserId uuid.UUID   `json:"target_user_id"`
 	NewRole      domain.Role `json:"new_role"`
 }
 
@@ -575,15 +608,15 @@ type RoleUpdateResponse struct {
 }
 
 type PremiumUpdateRequest struct {
-	TargetUserId string             `json:"target_user_id"`
-	NewPremium  domain.PremiumType `json:"new_premium"`
+	TargetUserId uuid.UUID          `json:"target_user_id"`
+	NewPremium   domain.PremiumType `json:"new_premium"`
 }
 
 type PremiumUpdateResponse struct {
 	Updated bool `json:"updated"`
 }
 
-type GetMeRequest struct {}
+type GetMeRequest struct{}
 type GetMeResponse struct {
 	User User `json:"user"`
 }
@@ -608,14 +641,11 @@ type AdminGetUserResponse struct {
 	User User `json:"user"`
 }
 
-// message UpdateUserRequest {
-//   optional string name  = 1;
-//   optional string email = 2;
-//   optional string avatar_url = 3;
-//   optional string bio = 4;
-// }
 type UpdateUserRequest struct {
-	// TODO
+	Name      *string `json:"name"`
+	Email     *string `json:"email"`
+	AvatarURL *string `json:"avatar_url"`
+	Bio       *string `json:"bio"`
 }
 
 type UpdateUserResponse struct {
@@ -634,7 +664,7 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-type LogoutResponse struct {}
+type LogoutResponse struct{}
 type BanUserRequest struct {
 	UserId uuid.UUID `json:"id"`
 }
@@ -650,27 +680,28 @@ type UnBanUserResponse struct {
 	Unbanned bool `json:"unbanned"`
 }
 type User struct {
-	Id         uuid.UUID `json:"id"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Role       domain.Role `json:"role"`
-	Premium    domain.PremiumType `json:"premium"`
-	AvatarUrl  string `json:"avatar_url"`
-	Bio        string `json:"bio"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	Id        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	Email     string             `json:"email"`
+	Role      domain.Role        `json:"role"`
+	Premium   domain.PremiumType `json:"premium"`
+	AvatarUrl string             `json:"avatar_url"`
+	Bio       string             `json:"bio"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
 }
 
 type PublicUser struct {
-	Id         uuid.UUID `json:"id"`
-	Name       string `json:"name"`
-	Role       domain.Role `json:"role"`
-	Premium    domain.PremiumType `json:"premium"`
-	AvatarUrl  string `json:"avatar_url"`
-	Bio        string `json:"bio"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-}=== FILE: ./api-gateway/internal/transport/httpapi/health.go ===
+	Id        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	Role      domain.Role        `json:"role"`
+	Premium   domain.PremiumType `json:"premium"`
+	AvatarUrl string             `json:"avatar_url"`
+	Bio       string             `json:"bio"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
+}
+=== FILE: ./api-gateway/internal/transport/httpapi/health.go ===
 package httpapi
 
 import "net/http"
@@ -683,7 +714,11 @@ func Health(w http.ResponseWriter, r *http.Request) {
 package mapper
 
 import (
+	"fmt"
+
+	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/dto"
+	"github.com/monstrong/gracker2/pkg/domain"
 
 	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1"
 )
@@ -699,6 +734,31 @@ func ToLoginHTTP(resp *authv1.LoginResponse) dto.LoginResponse {
         AccessToken:  resp.AccessToken,
         RefreshToken: resp.RefreshToken,
     }
+}
+
+func ToGetMeHTTP(resp *authv1.GetMeResponse) (dto.GetMeResponse, error) {
+    if resp == nil || resp.User == nil {
+        return dto.GetMeResponse{}, fmt.Errorf("empty user response")
+    }
+    
+    id, err := uuid.Parse(resp.User.Id)
+    if err != nil {
+        return dto.GetMeResponse{}, fmt.Errorf("invalid user UUID: %w", err)
+    }
+
+    return dto.GetMeResponse{
+        User: dto.User{
+            Id:        id,
+            Name:      resp.User.Name,
+            Email:     resp.User.Email,
+            Role:      domain.Role(resp.User.Role),
+            Premium:   domain.PremiumType(resp.User.Premium),
+            AvatarUrl: resp.User.AvatarUrl,
+            Bio:       resp.User.Bio,
+            CreatedAt: resp.User.CreatedAt.AsTime(),
+            UpdatedAt: resp.User.UpdatedAt.AsTime(),
+        },
+    }, nil
 }
 
 func ToRefreshGRPC(req dto.RefreshRequest) *authv1.RefreshRequest {
@@ -801,6 +861,9 @@ const (
 	Free
 	Premium
 )
+=== FILE: ./pkg/observability/tracing.go ===
+package observability
+
 === FILE: ./pkg/contracts/grpcmetakey/keys.go ===
 package grpcmetakey
 
