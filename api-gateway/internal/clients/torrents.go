@@ -21,7 +21,7 @@ func NewTorrentClient(addr string) (*TorrentClient, error) {
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(
-			insecure.NewCredentials(), // TODO: add tls
+			insecure.NewCredentials(),
 		),
 	)
 	if err != nil {

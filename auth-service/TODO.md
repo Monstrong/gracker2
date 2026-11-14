@@ -1,3 +1,4 @@
+TODO
 1. Трейсинг: OpenTelemetry вместо x-trace-id
 2. Больше метрик в /metrics (например можно добавить длительность из Logging Interceptor)
 

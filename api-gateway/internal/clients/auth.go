@@ -22,7 +22,7 @@ func NewAuthClient(addr string) (*AuthGrpcClient, error) {
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(
-			insecure.NewCredentials(), // TODO: add tls
+			insecure.NewCredentials(),
 		),
 	)
 	if err != nil {

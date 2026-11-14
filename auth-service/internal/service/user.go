@@ -244,7 +244,7 @@ func (s *UserService) DeleteUser(ctx context.Context, id uuid.UUID, senderRole m
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	}
 
-	if senderRole == models.OwnerRole {
+	if currentRole == models.OwnerRole {
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	}
 
@@ -319,35 +319,35 @@ func (s *UserService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassw
 }
 
 func validateAvatarURL(url string) error {
-	return nil
+	return nil // TODO
 }
 
 func validateBio(bio string) error {
-	return nil
+	return nil // TODO
 }
 func validateID(id uuid.UUID) error {
-	return nil
+	return nil // TODO
 }
 
 func validateName(name string) error {
-	return nil
+	return nil // TODO
 }
 
 func validateEmail(email string) error {
-	return nil
+	return nil // TODO
 }
 
 func validatePassword(password string) error {
 	// validatePassword: len > 72
-	return nil
+	return nil // TODO
 }
 
 func validateRole(role models.Role) error {
-	return nil
+	return nil // TODO
 }
 
 func validatePremiumType(premium models.PremiumType) error {
-	return nil
+	return nil // TODO
 }
 
 func validateUserPatch(u *models.UserPatch) error {

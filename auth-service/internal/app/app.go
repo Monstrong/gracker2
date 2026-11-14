@@ -68,8 +68,8 @@ func New(ctx context.Context) (*App, error) {
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptors.RecoveryInterceptor(l),
 			interceptors.LoggingInterceptor(l),
+			interceptors.RecoveryInterceptor(l),
 			interceptors.TimeoutInterceptor(&cfg.Grpc),
 		))
 	pb.RegisterAuthServiceServer(grpcServer, handler)

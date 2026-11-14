@@ -3,6 +3,7 @@ package interceptors
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 
 	"github.com/monstrong/gracker2/pkg/logger"
 	"google.golang.org/grpc"
@@ -24,6 +25,7 @@ func RecoveryInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 				l.Error(ctx, "panic recovered",
 					logger.String("method", info.FullMethod),
 					logger.String("panic", fmt.Sprintf("%v", p)),
+					logger.String("stack", string(debug.Stack())),
 				)
 
 				// подмена ошибки чтобы пользователь не увидел её текст

@@ -116,7 +116,7 @@ func toGRPCError(err error) error {
 		return status.Error(codes.PermissionDenied, errs.ErrPermissionDenied.Error())
 	}
 	if errors.Is(err, errs.ErrPasswordMismatch) {
-		return status.Error(codes.Unauthenticated, errs.ErrPasswordMismatch.Error())
+		return status.Error(codes.InvalidArgument, errs.ErrPasswordMismatch.Error())
 	}
 	if errors.Is(err, errs.ErrWrongMethod) {
 		return status.Error(codes.InvalidArgument, errs.ErrWrongMethod.Error())
