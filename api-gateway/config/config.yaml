@@ -4,8 +4,12 @@ server:
   timeout: 5s
 
 services:
-  auth_addr: "localhost:50052"
-  torrent_addr: "localhost:50051"
+  auth:
+    addr: "localhost:50052"
+    timeout: 5s
+  torrent:
+    addr: "localhost:50051"
+    timeout: 5s
 
 logger:
   level: local

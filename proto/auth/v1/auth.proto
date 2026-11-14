@@ -51,28 +51,17 @@ message RefreshResponse {
   string refresh_token = 2;
 }
 
-message ValidateRequest { string access_token = 1; }
-
-message ValidateResponse {
-  string id = 1;
-  Role role = 2;
-  Premium premium = 3;
-}
-
 message RoleUpdateRequest {
   string target_user_id = 1;
   Role new_role = 2;
 }
-
-
-message PremiumUpdateResponse {  bool updated = 1; }  // caller must check updated
+message RoleUpdateResponse { bool updated = 1; }
 
 message PremiumUpdateRequest {
   string target_user_id = 1;
   Premium new_premium = 2;
 }
-
-message RoleUpdateResponse { bool updated = 1; }
+message PremiumUpdateResponse {  bool updated = 1; }  // caller must check updated
 
 message GetMeRequest {}
 message GetMeResponse { User user = 1; }

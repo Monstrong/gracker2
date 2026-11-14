@@ -1,11 +1,770 @@
 === FILE: ./api-gateway/cmd/server/main.go ===
-package main=== FILE: ./api-gateway/TODO.md ===
-1. Middleware: jwt.Parse (проверка exp встроена)
-2. проверка на количество запросов. Нельзя спамить ручку Login чтобы просматривать какие email есть а каких нет по времени обработки запроса=== FILE: ./api-gateway/go.mod ===
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/monstrong/gracker2/api-gateway/internal/app"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	a, err := app.New(ctx)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+
+	return a.Run(ctx)
+}=== FILE: ./api-gateway/TODO.md ===
+1. Middleware: проверка JWT для защищённых маршрутов, установка пользовательских данных в контекст HTTP-запроса.
+2. Middleware: Логирование, CORS, ограничение частоты запросов, trace ID и метрики=== FILE: ./api-gateway/config/.env.example ===
+JWT_SECRET==== FILE: ./api-gateway/config/config.yaml ===
+server:
+  name: api-gateway
+  port: 8082
+  timeout: 5s
+
+services:
+  auth:
+    addr: "localhost:50052"
+    timeout: 5s
+  torrent:
+    addr: "localhost:50051"
+    timeout: 5s
+
+logger:
+  level: local
+
+graceful_shutdown_timeout: 15s=== FILE: ./api-gateway/go.mod ===
 module github.com/monstrong/gracker2/api-gateway
 
 go 1.26.2
-=== FILE: ./README.md ===
+
+require (
+	github.com/go-chi/chi v1.5.5
+	github.com/go-chi/chi/v5 v5.5.0
+	github.com/joho/godotenv v1.5.1
+	github.com/monstrong/gracker2/pkg v0.0.0-20261029125750-09f68ffd5c14
+	github.com/monstrong/gracker2/proto v0.0.0-00010101000000-000000000000
+	github.com/spf13/viper v1.21.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/zap v1.28.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
+)
+
+replace github.com/monstrong/gracker2/proto => ../proto
+=== FILE: ./api-gateway/internal/app/app.go ===
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+
+	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
+	"github.com/monstrong/gracker2/pkg/logger"
+)
+
+// TODO: Исправить: при завершении через сигнал Run() не ожидает serveErr после Shutdown.
+
+type App struct {
+	cfg        *gatewayconfig.Config
+	httpServer *http.Server
+	l          logger.Logger
+	clients    []Client
+}
+
+type Client interface { // io.Closer
+	Close() error
+}
+
+func New(ctx context.Context) (*App, error) {
+	cfg, err := gatewayconfig.Load()
+	if err != nil {
+		return nil, fmt.Errorf("init config: %w", err)
+	}
+
+	l, err := logger.New(&cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("init logger: %w", err)
+	}
+	l.Info(ctx, "config & logger init complete")
+
+	server := newHttpServer(&cfg.Server)
+
+	return &App{
+		cfg:        cfg,
+		httpServer: server,
+		l:          l,
+	}, nil
+}
+
+func (a *App) Run(ctx context.Context) error {
+	logCtx := context.WithoutCancel(ctx) // контекст для логгера (останется после отмены основного через gracefulShutdown)
+
+	serveErr := make(chan error, 1)
+	go func() {
+		a.l.Info(logCtx, "api-gateway server starting")
+
+		err := a.httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil // штатное завершение
+		}
+		serveErr <- err
+	}()
+
+	select {
+	case err := <-serveErr:
+		if err != nil {
+			a.l.Error(logCtx, "api-gateway server failed", logger.Error(err))
+			return fmt.Errorf("api-gateway server: %w", err)
+		}
+		a.l.Info(logCtx, "api-gateway server stopped")
+		return nil
+	case <-ctx.Done():
+		a.l.Info(logCtx, "shutdown signal received")
+	}
+
+	if err := a.shutdown(logCtx); err != nil {
+		a.l.Error(logCtx, "graceful shutdown failed", logger.Error(err))
+		return err
+	}
+
+	a.l.Info(logCtx, "api-gateway stopped gracefully")
+	return nil
+}
+
+// graceful shutdown
+func (a *App) shutdown(ctx context.Context) error {
+	a.l.Info(ctx, "shutting down")
+
+	shutCtx, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
+	defer cancel()
+
+	if err := a.httpServer.Shutdown(shutCtx); err != nil {
+		_ = a.httpServer.Close()
+		return fmt.Errorf("http server shutdown: %w", err)
+	}
+
+	return nil
+}
+func (a *App) Close() error {
+	a.l.Sync()
+
+	var errs []error 
+	// закрывает все соединения клиентов
+    for _, c := range a.clients {
+        if err := c.Close(); err != nil {
+            errs = append(errs, err)
+        }
+    }
+    return errors.Join(errs...)
+}
+=== FILE: ./api-gateway/internal/app/httpServer.go ===
+package app
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi"
+)
+
+func newHttpServer(cfg *gatewayconfig.Server) *http.Server {
+	r := httpapi.NewRouter
+
+	return &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.Port),
+		Handler: r(),
+		ReadHeaderTimeout: cfg.Timeout,
+		WriteTimeout:      cfg.Timeout,
+		ReadTimeout:       cfg.Timeout,
+		IdleTimeout:       cfg.Timeout*6,
+	}
+}=== FILE: ./api-gateway/internal/gatewayconfig/config.go ===
+package gatewayconfig
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/monstrong/gracker2/pkg/config"
+	"github.com/spf13/viper"
+)
+
+const configYamlPath = "config/config.yaml"
+const configEnvPath = "config/.env"
+
+const secretKey = "JWT_SECRET"
+
+type Config struct {
+	Logger config.Logger `mapstructure:"logger" yaml:"logger"`
+
+	Services Services `mapstructure:"services" yaml:"services"`
+	Server Server `mapstructure:"server" yaml:"server"`
+	JWT_Secret string
+
+	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout" yaml:"graceful_shutdown_timeout"`
+}
+
+type Services struct {
+	Auth Auth `mapstructure:"auth" yaml:"auth"`
+	Torrent Torrent `mapstructure:"torrent" yaml:"torrent"`
+}
+
+type Auth struct {
+	Addr string `mapstructure:"addr" yaml:"addr"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Torrent struct {
+	Addr string `mapstructure:"addr" yaml:"addr"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Server struct {
+	Name    string        `mapstructure:"name" yaml:"name"`
+	Port    int           `mapstructure:"port" yaml:"port"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+func Load() (*Config, error) {
+	v := viper.New()
+	v.SetConfigFile(configYamlPath)
+	cfg := &Config{}
+
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("error reading config.yaml: %w", err)
+	}
+
+	if err := godotenv.Load(configEnvPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Println("no .env file found")
+	}
+
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	if err := v.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}	
+	
+	cfg.JWT_Secret = os.Getenv(secretKey)
+	
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func (c *Config) validate() error {
+	switch {
+	// services
+	case c.Services.Auth.Addr == "":
+		return fmt.Errorf("invalid auth_addr: empty")
+	case c.Services.Torrent.Addr == "":
+		return fmt.Errorf("invalid torrent_addr: empty")
+	case c.Services.Auth.Timeout <= 0 || c.Services.Auth.Timeout > time.Minute:
+		return fmt.Errorf("invalid auth_timeout: %s, must be > 0 and <= 1m", c.Services.Auth.Timeout)
+	case c.Services.Torrent.Timeout <= 0 || c.Services.Torrent.Timeout > time.Minute:
+		return fmt.Errorf("invalid torrent_timeout: %s, must be > 0 and <= 1m", c.Services.Torrent.Timeout)
+
+	// graceful_shutdown_timeout
+	case c.GracefulShutdownTimeout <= 0 || c.GracefulShutdownTimeout > time.Minute:
+		return fmt.Errorf("invalid graceful_shutdown_timeout: %s, must be > 0 and <= 1m", c.GracefulShutdownTimeout)
+
+	// server
+	case c.Server.Name == "":
+		return fmt.Errorf("invalid server name: empty")
+	case c.Server.Port <= 0:
+		return fmt.Errorf("invalid server port: %d, must be > 0", c.Server.Port)
+	case c.Server.Timeout <= 0 || c.Server.Timeout > time.Minute:
+		return fmt.Errorf("invalid server timeout: %s, must be > 0 and <= 1m", c.Server.Timeout)
+
+	// logger
+	case c.Logger.Level == "":
+		return fmt.Errorf("invalid logger level: empty")
+
+	default:
+		return nil
+	}
+}=== FILE: ./api-gateway/internal/clients/auth.go ===
+package clients
+
+import (
+	"context"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // при смене версии сменить версию
+)
+
+type AuthClient struct {
+	conn   *grpc.ClientConn
+	client authv1.AuthServiceClient
+}
+
+func (c *AuthClient) Close() error {
+	return c.conn.Close()
+}
+func NewAuthClient(addr string) (*AuthClient, error) {
+
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(
+			insecure.NewCredentials(), // TODO: add tls
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := authv1.NewAuthServiceClient(conn)
+
+	return &AuthClient{conn: conn, client: client}, nil
+}
+
+func (c *AuthClient) Login(
+	ctx context.Context,
+	req *authv1.LoginRequest,
+) (*authv1.LoginResponse, error) {
+	return c.client.Login(ctx, req)
+}
+
+func (c *AuthClient) GetMe(
+	ctx context.Context,
+	req *authv1.GetMeRequest,
+) (*authv1.GetMeResponse, error) {
+	return c.client.GetMe(ctx, req)
+}=== FILE: ./api-gateway/internal/clients/torrents.go ===
+package clients
+
+import (
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	torrentv1 "github.com/monstrong/gracker2/proto/gen/go/torrent/v1"
+)
+
+type TorrentClient struct {
+	conn   *grpc.ClientConn
+	client torrentv1.TorrentServiceClient
+}
+
+func (c *TorrentClient) Close() error {
+	return c.conn.Close()
+}
+
+func NewTorrentClient(addr string) (*TorrentClient, error) {
+
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(
+			insecure.NewCredentials(), // TODO: add tls
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := torrentv1.NewTorrentServiceClient(conn)
+
+	return &TorrentClient{conn: conn, client: client}, nil
+}
+=== FILE: ./api-gateway/internal/transport/httpapi/handlers/auth.go ===
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/monstrong/gracker2/api-gateway/internal/clients"
+	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
+	"github.com/monstrong/gracker2/api-gateway/internal/middleware"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/dto"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/mapper"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
+	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1"
+)
+
+type AuthHandler struct {
+    authClient clients.AuthClient
+	cfg gatewayconfig.Auth
+}
+
+func NewAuthHandler(authClient clients.AuthClient, cfg gatewayconfig.Auth) *AuthHandler {
+	return &AuthHandler{authClient: authClient, cfg: cfg}
+}
+
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var req dto.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	grpcReq := mapper.ToLoginGRPC(req)
+
+    resp, err := h.authClient.Login(ctx, grpcReq)
+    if err != nil {
+        writeGRPCError(w, err)
+        return
+    }
+
+    httpResp := mapper.ToLoginHTTP(resp)
+
+    if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		// TODO: log
+	}
+}
+
+func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	ctx = metadata.AppendToOutgoingContext(
+        ctx,
+        "x-user-id", claims.UserID.String(),
+        "x-sender-role", strconv.Itoa(int(claims.Role)),
+    )
+
+	resp, err := h.authClient.GetMe(ctx, &authv1.GetMeRequest{})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp := mapper.ToGetMeHTTP(resp)
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		// TODO: log
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, data any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(data)
+}
+func writeGRPCError(w http.ResponseWriter, err error) {
+	st, ok := status.FromError(err)
+	if !ok {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	
+	switch st.Code() {
+    case codes.InvalidArgument:
+        http.Error(w, st.Message(), http.StatusBadRequest)
+    case codes.Unauthenticated:
+        http.Error(w, st.Message(), http.StatusUnauthorized)
+    case codes.PermissionDenied:
+        http.Error(w, st.Message(), http.StatusForbidden)
+    case codes.NotFound:
+        http.Error(w, st.Message(), http.StatusNotFound)
+    case codes.AlreadyExists:
+        http.Error(w, st.Message(), http.StatusConflict)
+    case codes.DeadlineExceeded:
+        http.Error(w, st.Message(), http.StatusGatewayTimeout)
+    case codes.Unavailable:
+        http.Error(w, st.Message(), http.StatusServiceUnavailable)
+    default:
+        http.Error(w, "internal server error", http.StatusInternalServerError)
+    }
+}=== FILE: ./api-gateway/internal/transport/httpapi/dto/auth.go ===
+package dto
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/monstrong/gracker2/pkg/domain"
+)
+
+type RegisterRequest struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type RegisterResponse struct {
+	Id uuid.UUID `json:"id"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type RefreshResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type RoleUpdateRequest struct {
+	TargetUserId string      `json:"target_user_id"`
+	NewRole      domain.Role `json:"new_role"`
+}
+
+type RoleUpdateResponse struct {
+	Updated bool `json:"updated"`
+}
+
+type PremiumUpdateRequest struct {
+	TargetUserId string             `json:"target_user_id"`
+	NewPremium  domain.PremiumType `json:"new_premium"`
+}
+
+type PremiumUpdateResponse struct {
+	Updated bool `json:"updated"`
+}
+
+type GetMeRequest struct {}
+type GetMeResponse struct {
+	User User `json:"user"`
+}
+
+type GetUserRequest struct {
+	UserId uuid.UUID `json:"id"`
+}
+type GetUserResponse struct {
+	User PublicUser `json:"user"`
+}
+type DeleteUserRequest struct {
+	UserId uuid.UUID `json:"id"`
+}
+type DeleteUserResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+type AdminGetUserRequest struct {
+	Id uuid.UUID `json:"id"`
+}
+type AdminGetUserResponse struct {
+	User User `json:"user"`
+}
+
+// message UpdateUserRequest {
+//   optional string name  = 1;
+//   optional string email = 2;
+//   optional string avatar_url = 3;
+//   optional string bio = 4;
+// }
+type UpdateUserRequest struct {
+	// TODO
+}
+
+type UpdateUserResponse struct {
+	User User `json:"user"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+type ChangePasswordResponse struct {
+	Changed bool `json:"changed"`
+}
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type LogoutResponse struct {}
+type BanUserRequest struct {
+	UserId uuid.UUID `json:"id"`
+}
+type BanUserResponse struct {
+	Banned bool `json:"banned"`
+}
+
+type UnBanUserRequest struct {
+	UserId uuid.UUID `json:"id"`
+}
+
+type UnBanUserResponse struct {
+	Unbanned bool `json:"unbanned"`
+}
+type User struct {
+	Id         uuid.UUID `json:"id"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Role       domain.Role `json:"role"`
+	Premium    domain.PremiumType `json:"premium"`
+	AvatarUrl  string `json:"avatar_url"`
+	Bio        string `json:"bio"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type PublicUser struct {
+	Id         uuid.UUID `json:"id"`
+	Name       string `json:"name"`
+	Role       domain.Role `json:"role"`
+	Premium    domain.PremiumType `json:"premium"`
+	AvatarUrl  string `json:"avatar_url"`
+	Bio        string `json:"bio"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}=== FILE: ./api-gateway/internal/transport/httpapi/health.go ===
+package httpapi
+
+import "net/http"
+
+func Health(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8") // необязательно, но пусть будет
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}=== FILE: ./api-gateway/internal/transport/httpapi/mapper/auth.go ===
+package mapper
+
+import (
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/dto"
+
+	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1"
+)
+func ToLoginGRPC(req dto.LoginRequest) *authv1.LoginRequest {
+    return &authv1.LoginRequest{
+        Email:    req.Email,
+        Password: req.Password,
+    }
+}
+
+func ToLoginHTTP(resp *authv1.LoginResponse) dto.LoginResponse {
+    return dto.LoginResponse{
+        AccessToken:  resp.AccessToken,
+        RefreshToken: resp.RefreshToken,
+    }
+}
+
+func ToRefreshGRPC(req dto.RefreshRequest) *authv1.RefreshRequest {
+	return &authv1.RefreshRequest{
+		RefreshToken: req.RefreshToken,
+	}
+}=== FILE: ./api-gateway/internal/transport/httpapi/router.go ===
+package httpapi
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+)
+
+func NewRouter() http.Handler {
+    r := chi.NewRouter()
+
+    r.Use(middleware.RequestID)
+    r.Use(middleware.Recoverer)
+
+    r.Get("/health", Health)
+
+    return r
+}=== FILE: ./api-gateway/internal/middleware/jwt.go ===
+package middleware
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"github.com/monstrong/gracker2/pkg/jwtparser"
+)
+
+const userClaimsKey string = "user_claims"
+
+func AuthMiddleware(tokenManager jwtparser.TokenManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			parts := strings.Fields(authHeader)
+
+			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
+				http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)
+    			return
+			}
+			
+			tokenString := parts[1]
+			claims, err := tokenManager.Parse(tokenString)
+			if err != nil {
+				http.Error(w, "invalid token", http.StatusUnauthorized)
+				return
+			}
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, userClaimsKey, claims)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func GetClaims(ctx context.Context) (*jwtparser.Claims, bool) {
+	claims, ok := ctx.Value(userClaimsKey).(*jwtparser.Claims)
+	return claims, ok
+}=== FILE: ./README.md ===
 торрент-трекер написанный полностью моими руками, без нейронок=== FILE: ./pkg/domain/models.go ===
 package domain
 
@@ -42,7 +801,13 @@ const (
 	Free
 	Premium
 )
-=== FILE: ./pkg/db/postgres.go ===
+=== FILE: ./pkg/contracts/grpcmetakey/keys.go ===
+package grpcmetakey
+
+const (
+	GRPCMetaKeyUserID = "x-user-id"
+	GRPCMetaKeyRole   = "x-role"
+)=== FILE: ./pkg/db/postgres.go ===
 package db
 
 import (
@@ -148,7 +913,6 @@ type Logger struct {
 
 const configYamlPath = "config/config.yaml"
 const configEnvPath = "config/.env"
-const postgresPasswordName = "POSTGRES_PASSWORD"
 
 
 // use it in your custom config struct
@@ -172,24 +936,6 @@ func LoadInto(target any) error {
 	}
 
 	return nil
-}
-
-// old func, better use LoadInto with your custom config struct
-// migrations or small services use this
-func Load() (*Config, error) { 
-	cfg := &Config{}
-
-	if err := LoadInto(cfg); err != nil {
-		return nil, err
-	}
-
-	cfg.Postgres.Password = os.Getenv(postgresPasswordName)
-
-	if err := cfg.validate(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
 }
 
 // use it in your custom config struct
@@ -669,7 +1415,7 @@ type Manager struct {
 }
 
 type Claims struct {
-	UserID  uuid.UUID             `json:"user_id"`
+	UserID  uuid.UUID          `json:"user_id"`
 	Role    domain.Role        `json:"role"`
 	Premium domain.PremiumType `json:"premium"`
 	jwt.RegisteredClaims
@@ -702,7 +1448,9 @@ func (m *Manager) Parse(tokenString string) (*Claims, error) {
 	}
 	return &claims, nil
 }
-=== FILE: ./.gitignore ===
+=== FILE: ./TODO.md ===
+TLS-сертификация
+Трейсинг: OpenTelemetry вместо x-trace-id=== FILE: ./.gitignore ===
 .env
 *.env
 !.env.example=== FILE: ./docker-compose.yml ===
@@ -787,28 +1535,17 @@ message RefreshResponse {
   string refresh_token = 2;
 }
 
-message ValidateRequest { string access_token = 1; }
-
-message ValidateResponse {
-  string id = 1;
-  Role role = 2;
-  Premium premium = 3;
-}
-
 message RoleUpdateRequest {
   string target_user_id = 1;
   Role new_role = 2;
 }
-
-
-message PremiumUpdateResponse {  bool updated = 1; }  // caller must check updated
+message RoleUpdateResponse { bool updated = 1; }
 
 message PremiumUpdateRequest {
   string target_user_id = 1;
   Premium new_premium = 2;
 }
-
-message RoleUpdateResponse { bool updated = 1; }
+message PremiumUpdateResponse {  bool updated = 1; }  // caller must check updated
 
 message GetMeRequest {}
 message GetMeResponse { User user = 1; }
@@ -1013,12 +1750,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/monstrong/gracker2/pkg/config"
 	"github.com/monstrong/gracker2/pkg/db"
+	"github.com/monstrong/gracker2/torrent-service/internal/torrentconfig"
 )
 
 func main() {
-	cfg, err := config.Load()
+	cfg, err := torrentconfig.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1180,20 +1917,20 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/gracker2/pkg/config"
 	"github.com/monstrong/gracker2/pkg/db"
 	"github.com/monstrong/gracker2/pkg/interceptors"
 	"github.com/monstrong/gracker2/pkg/logger"
 	pb "github.com/monstrong/gracker2/proto/gen/go/torrent/v1" // <-- при смене версии изменить
 	"github.com/monstrong/gracker2/torrent-service/internal/repository"
 	"github.com/monstrong/gracker2/torrent-service/internal/service"
+	"github.com/monstrong/gracker2/torrent-service/internal/torrentconfig"
 	transport "github.com/monstrong/gracker2/torrent-service/internal/transport/grpc"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
 type App struct {
-	cfg        *config.Config
+	cfg        *torrentconfig.Config
 	l          logger.Logger
 	pool       *pgxpool.Pool
 	grpcServer *grpc.Server
@@ -1201,7 +1938,7 @@ type App struct {
 }
 
 func New(ctx context.Context) (*App, error) {
-	cfg, err := config.Load()
+	cfg, err := torrentconfig.Load()
 	if err != nil {
 		return nil, fmt.Errorf("init config: %w", err)
 	}
@@ -1750,6 +2487,35 @@ func toProto(m *models.Torrent) *pb.Torrent {
 		CreatedAt: timestamppb.New(m.CreatedAt),
 		UpdatedAt: timestamppb.New(m.UpdatedAt),
 	}
+}=== FILE: ./torrent-service/internal/torrentconfig/config.go ===
+package torrentconfig
+
+import (
+	"os"
+
+	"github.com/monstrong/gracker2/pkg/config"
+)
+
+type Config struct {
+	config.Config `mapstructure:",squash"`
+}
+
+const postgresPasswordKey = "POSTGRES_PASSWORD"
+
+func Load() (*Config, error) {
+	cfg := &Config{}
+
+	if err := config.LoadInto(cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.Postgres.Password = os.Getenv(postgresPasswordKey)
+
+	if err := config.Validate(&cfg.Config); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }=== FILE: ./torrent-service/internal/models/torrent.go ===
 package models
 
@@ -1799,7 +2565,7 @@ run:
 
 Роли Owner и Billing выдаются только прямым sql-запросом в бд
 после смены роли пользователя его старый jwt токен ещё работает до конца ttl
-доступ к auth-service должен быть только у api-gateway. порты должны быть открыты только для него=== FILE: ./testing_field/go.mod ===
+доступ к auth-service должен быть только у api-gateway и Billing. порты должны быть открыты только для них=== FILE: ./testing_field/go.mod ===
 module github/monstrong/gracker2/testing_field
 
 go 1.26.2
@@ -1898,12 +2664,13 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/monstrong/gracker2/pkg/config"
+
+	"github.com/monstrong/gracker2/auth-service/internal/authconfig"
 	"github.com/monstrong/gracker2/pkg/db"
 )
 
 func main() {
-	cfg, err := config.Load()
+	cfg, err := authconfig.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -2150,7 +2917,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/monstrong/gracker2/pkg v0.0.0-00010101000000-000000000000
-	github.com/monstrong/gracker2/proto v0.1.0
+	github.com/monstrong/gracker2/proto v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.25.0
 	github.com/redis/go-redis/v9 v9.23.0
 	golang.org/x/crypto v0.58.0
@@ -2291,7 +3058,7 @@ func New(ctx context.Context) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	logCtx := context.WithoutCancel(ctx)
+	logCtx := context.WithoutCancel(ctx) // контекст для логгера (останется после отмены основного через gracefulShutdown)
 
 	g, gctx := errgroup.WithContext(ctx)
 
@@ -3598,14 +4365,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/contracts/grpcmetakey"
 	"github.com/monstrong/gracker2/pkg/errs"
 	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-const UserIDKey = "x-user-id"
-const SenderRoleKey = "x-sender-role"
 
 func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	id, err := s.s.Register(ctx, in.GetName(), in.GetEmail(), in.GetPassword())
@@ -3675,7 +4440,7 @@ func (s *Server) LogoutEverywhere(ctx context.Context, in *pb.LogoutEverywhereRe
 func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.RoleUpdateResponse, error) {
 	id, err := uuid.Parse(in.GetTargetUserId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 	MD, _ := metadata.FromIncomingContext(ctx)
 
@@ -3695,7 +4460,7 @@ func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.
 func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest) (*pb.PremiumUpdateResponse, error) {
 	id, err := uuid.Parse(in.GetTargetUserId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 	MD, _ := metadata.FromIncomingContext(ctx)
 
@@ -3730,7 +4495,7 @@ func (s *Server) GetMe(ctx context.Context, in *pb.GetMeRequest) (*pb.GetMeRespo
 func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 	user, err := s.s.GetUser(ctx, id)
 	if err != nil {
@@ -3743,7 +4508,7 @@ func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUse
 func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (*pb.AdminGetUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
@@ -3786,7 +4551,7 @@ func (s *Server) UpdateUser(ctx context.Context, in *pb.UpdateUserRequest) (*pb.
 func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
@@ -3812,7 +4577,7 @@ func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.
 func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
@@ -3833,7 +4598,7 @@ func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUse
 func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.UnBanUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
 	MD, _ := metadata.FromIncomingContext(ctx)
@@ -3869,30 +4634,30 @@ func (s *Server) ChangePassword(ctx context.Context, in *pb.ChangePasswordReques
 }
 
 func checkIDfromMD(MD metadata.MD) (userID uuid.UUID, err error) {
-	vals := MD.Get(UserIDKey)
+	vals := MD.Get(grpcmetakey.GRPCMetaKeyUserID)
 
 	if len(vals) > 0 {
 		if userID, err = uuid.Parse(vals[0]); err != nil {
-			return uuid.Nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+			return uuid.Nil, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 		}
 	} else {
-		return uuid.Nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "empty user id"}
+		return uuid.Nil, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "empty user id"}
 	}
 
 	return
 }
 
 func checkSenderRolefromMD(MD metadata.MD) (SenderRole models.Role, err error) {
-	vals := MD.Get(SenderRoleKey)
+	vals := MD.Get(grpcmetakey.GRPCMetaKeyRole)
 
 	if len(vals) > 0 {
 		roleValue, err := strconv.ParseInt(vals[0], 10, 8)
 		if err != nil {
-			return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: SenderRoleKey, Reason: "invalid role format"}
+			return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyRole, Reason: "invalid role format"}
 		}
 		SenderRole = models.Role(roleValue)
 	} else {
-		return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: SenderRoleKey, Reason: "empty role"}
+		return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyRole, Reason: "empty role"}
 	}
 
 	return

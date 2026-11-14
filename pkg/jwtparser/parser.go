@@ -20,7 +20,7 @@ type Manager struct {
 }
 
 type Claims struct {
-	UserID  uuid.UUID             `json:"user_id"`
+	UserID  uuid.UUID          `json:"user_id"`
 	Role    domain.Role        `json:"role"`
 	Premium domain.PremiumType `json:"premium"`
 	jwt.RegisteredClaims

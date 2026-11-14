@@ -23,12 +23,23 @@ type Config struct {
 	Services Services `mapstructure:"services" yaml:"services"`
 	Server Server `mapstructure:"server" yaml:"server"`
 	JWT_Secret string
+
 	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout" yaml:"graceful_shutdown_timeout"`
 }
 
 type Services struct {
-	AuthAddr string `mapstructure:"auth_addr" yaml:"auth_addr"`
-	TorrentAddr string `mapstructure:"torrent_addr" yaml:"torrent_addr"`
+	Auth Auth `mapstructure:"auth" yaml:"auth"`
+	Torrent Torrent `mapstructure:"torrent" yaml:"torrent"`
+}
+
+type Auth struct {
+	Addr string `mapstructure:"addr" yaml:"addr"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Torrent struct {
+	Addr string `mapstructure:"addr" yaml:"addr"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
 }
 
 type Server struct {
@@ -69,10 +80,14 @@ func Load() (*Config, error) {
 func (c *Config) validate() error {
 	switch {
 	// services
-	case c.Services.AuthAddr == "":
+	case c.Services.Auth.Addr == "":
 		return fmt.Errorf("invalid auth_addr: empty")
-	case c.Services.TorrentAddr == "":
+	case c.Services.Torrent.Addr == "":
 		return fmt.Errorf("invalid torrent_addr: empty")
+	case c.Services.Auth.Timeout <= 0 || c.Services.Auth.Timeout > time.Minute:
+		return fmt.Errorf("invalid auth_timeout: %s, must be > 0 and <= 1m", c.Services.Auth.Timeout)
+	case c.Services.Torrent.Timeout <= 0 || c.Services.Torrent.Timeout > time.Minute:
+		return fmt.Errorf("invalid torrent_timeout: %s, must be > 0 and <= 1m", c.Services.Torrent.Timeout)
 
 	// graceful_shutdown_timeout
 	case c.GracefulShutdownTimeout <= 0 || c.GracefulShutdownTimeout > time.Minute:

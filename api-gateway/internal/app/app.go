@@ -10,13 +10,17 @@ import (
 	"github.com/monstrong/gracker2/pkg/logger"
 )
 
-// TODO: при завершении через сигнал Run() не ожидает serveErr после Shutdown. 
-// мне гпт сказал что надо это как-то исправить
+// TODO: Исправить: при завершении через сигнал Run() не ожидает serveErr после Shutdown.
 
 type App struct {
 	cfg        *gatewayconfig.Config
 	httpServer *http.Server
 	l          logger.Logger
+	clients    []Client
+}
+
+type Client interface { // io.Closer
+	Close() error
 }
 
 func New(ctx context.Context) (*App, error) {
@@ -45,7 +49,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		a.l.Info(logCtx, "http infra server starting")
+		a.l.Info(logCtx, "api-gateway server starting")
 
 		err := a.httpServer.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {
@@ -57,10 +61,10 @@ func (a *App) Run(ctx context.Context) error {
 	select {
 	case err := <-serveErr:
 		if err != nil {
-			a.l.Error(logCtx, "http server failed", logger.Error(err))
-			return fmt.Errorf("http server: %w", err)
+			a.l.Error(logCtx, "api-gateway server failed", logger.Error(err))
+			return fmt.Errorf("api-gateway server: %w", err)
 		}
-		a.l.Info(logCtx, "http server stopped")
+		a.l.Info(logCtx, "api-gateway server stopped")
 		return nil
 	case <-ctx.Done():
 		a.l.Info(logCtx, "shutdown signal received")
@@ -72,25 +76,32 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	a.l.Info(logCtx, "api-gateway stopped gracefully")
-    return nil
+	return nil
 }
 
 // graceful shutdown
 func (a *App) shutdown(ctx context.Context) error {
-    a.l.Info(ctx, "shutting down")
+	a.l.Info(ctx, "shutting down")
 
-    shutCtx, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
-    defer cancel()
+	shutCtx, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
+	defer cancel()
 
-    if err := a.httpServer.Shutdown(shutCtx); err != nil {
-        _ = a.httpServer.Close()
-        return fmt.Errorf("http server shutdown: %w", err)
-    }
+	if err := a.httpServer.Shutdown(shutCtx); err != nil {
+		_ = a.httpServer.Close()
+		return fmt.Errorf("http server shutdown: %w", err)
+	}
 
-    return nil
+	return nil
 }
 func (a *App) Close() error {
 	a.l.Sync()
 
-	return nil
+	var errs []error 
+	// закрывает все соединения клиентов
+    for _, c := range a.clients {
+        if err := c.Close(); err != nil {
+            errs = append(errs, err)
+        }
+    }
+    return errors.Join(errs...)
 }
