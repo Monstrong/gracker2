@@ -57,7 +57,10 @@ func (s *Server) Logout(ctx context.Context, in *pb.LogoutRequest) (*pb.LogoutRe
 
 // LogoutEverywhere wants UserID in metadata
 func (s *Server) LogoutEverywhere(ctx context.Context, in *pb.LogoutEverywhereRequest) (*pb.LogoutEverywhereResponse, error) {
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	userID, err := checkIDfromMD(MD)
 	if err != nil {
@@ -83,7 +86,10 @@ func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.
 	if err != nil {
 		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -103,7 +109,10 @@ func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest)
 	if err != nil {
 		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -119,7 +128,10 @@ func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest)
 
 // GetMe wants UserID in metadata
 func (s *Server) GetMe(ctx context.Context, in *pb.GetMeRequest) (*pb.GetMeResponse, error) {
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	id, err := checkIDfromMD(MD)
 	if err != nil {
@@ -152,7 +164,10 @@ func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (
 		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD) 
 	if err != nil {
@@ -167,7 +182,10 @@ func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (
 
 // UpdateUser wants SenderID in metadata
 func (s *Server) UpdateUser(ctx context.Context, in *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	userID, err := checkIDfromMD(MD)
 	if err != nil {
@@ -195,7 +213,10 @@ func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.
 		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -221,7 +242,10 @@ func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUse
 		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -242,7 +266,10 @@ func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.Un
 		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -260,7 +287,10 @@ func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.Un
 // ChangePassword wants UserID in metadata
 func (s *Server) ChangePassword(ctx context.Context, in *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
 	
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	userID, err := checkIDfromMD(MD)
 	if err != nil {

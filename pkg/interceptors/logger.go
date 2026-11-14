@@ -79,6 +79,9 @@ func LoggingInterceptor(l logger.Logger) grpc.UnaryServerInterceptor {
 	}
 }
 
+// toGRPCError normalizes errors returned from service methods into gRPC
+// status errors.
+// DO NEVER return raw errors to gateway, 
 func toGRPCError(err error) error {
 	if err == nil {
 		return nil
@@ -125,5 +128,5 @@ func toGRPCError(err error) error {
 		return status.Error(codes.PermissionDenied, errs.ErrBannedUser.Error())
 	}
 	return status.Error(codes.Internal, errs.ErrInternal.Error())  
-	// GatewayWrongFieldError сюда же
+	// GatewayWrongFieldError идёт сюда же
 }

@@ -103,6 +103,10 @@ type LogoutRequest struct {
 }
 
 type LogoutResponse struct{}
+type LogoutEverywhereRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+type LogoutEverywhereResponse struct{}
 type BanUserRequest struct {
 	UserId uuid.UUID `json:"id"`
 }

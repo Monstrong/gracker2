@@ -14,7 +14,7 @@ var (
 	ErrPasswordMismatch   = errors.New("password mismatch")
 	ErrWrongMethod           = errors.New("wrong method")
 	ErrBannedUser            = errors.New("user is banned")
-
+	ErrMissingMetadata       = errors.New("missing metadata")
 )
 
 // insted of ErrInvalidData

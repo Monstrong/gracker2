@@ -1,4 +1,4 @@
-.PHONY: proto proto-clean $(addprefix proto-,$(SERVICES))
+.PHONY: tidy proto proto-clean $(addprefix proto-,$(SERVICES))
 
 # да, этот файл я сгенерил в нейронке
 
@@ -19,6 +19,10 @@ endif
 
 # Все proto файлы
 PROTO_FILES := $(foreach s,$(SERVICES),proto/$(s)/$(VERSION)/$(s).proto)
+
+# находит все go.mod, (кроме proto/gen) и делает go mod tidy
+tidy:
+	@find . -name go.mod -not -path "./proto/gen/*" -execdir sh -c 'echo "tidy: $$(pwd)" && go mod tidy' \;
 
 proto: $(PROTO_FILES)
 	@echo "Генерация для версии $(VERSION)"

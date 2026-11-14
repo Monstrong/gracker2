@@ -12,7 +12,7 @@ service AuthService {
   // rpc Validate(ValidateRequest) returns (ValidateResponse); - ПЕРЕНОС В API-GATEWAY
 
   rpc RoleUpdate(RoleUpdateRequest) returns (RoleUpdateResponse);
-  rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse);
+  rpc PremiumUpdate(PremiumUpdateRequest) returns (PremiumUpdateResponse); // only for Billing-service
 
   rpc GetMe(GetMeRequest) returns (GetMeResponse); // Свой профиль 
   rpc GetUser(GetUserRequest) returns (GetUserResponse); // без email
