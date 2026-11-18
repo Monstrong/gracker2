@@ -96,7 +96,7 @@ type ChangePasswordRequest struct {
 }
 
 type ChangePasswordResponse struct {
-	Changed bool `json:"changed"`
+	Updated bool `json:"changed"`
 }
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`

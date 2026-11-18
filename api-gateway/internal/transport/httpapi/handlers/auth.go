@@ -255,9 +255,327 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	httpResp, err := mapper.ToGetMeHTTP(resp)
 	if err != nil {
 		h.l.Error(ctx, op, logger.Error(err))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		writeGRPCError(w, err)
 		return
 	}
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.GetUser"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	var req dto.GetUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	grpcReq, err := mapper.ToGetUserGRPC(req)
+	if err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		writeGRPCError(w, err)
+		return
+	}
+
+	resp, err := h.authClient.GetUser(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp, err := mapper.ToGetUserHTTP(resp)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return 
+	}
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) AdminGetUser(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.AdminGetUser"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	var req dto.AdminGetUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx = metadata.AppendToOutgoingContext(
+		ctx,
+		grpcmetakey.GRPCMetaKeyRole, strconv.Itoa(int(claims.Role)),
+	)
+
+	grpcReq, err := mapper.ToAdminGetUserGRPC(req)
+	if err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		writeGRPCError(w, err)
+		return
+	}
+
+	resp, err := h.authClient.AdminGetUser(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp, err := mapper.ToAdminGetUserHTTP(resp)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return 
+	}
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.UpdateUser"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx = metadata.AppendToOutgoingContext(
+		ctx,
+		grpcmetakey.GRPCMetaKeyUserID, claims.UserID.String(),
+	)
+
+	var req dto.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	grpcReq := mapper.ToUpdateUserGRPC(req)
+
+	resp, err := h.authClient.UpdateUser(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp, err := mapper.ToUpdateUserHTTP(resp)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return 
+	}
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.DeleteUser"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx = metadata.AppendToOutgoingContext(
+		ctx,
+		grpcmetakey.GRPCMetaKeyRole, strconv.Itoa(int(claims.Role)),
+		grpcmetakey.GRPCMetaKeyUserID, claims.UserID.String(),
+	)
+
+	var req dto.DeleteUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	grpcReq, err := mapper.ToDeleteUserGRPC(req)
+	if err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		writeGRPCError(w, err)
+		return
+	}
+
+	resp, err := h.authClient.DeleteUser(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp := mapper.ToDeleteUserHTTP(resp)
+	
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) BanUser(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.BanUser"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx = metadata.AppendToOutgoingContext(
+		ctx,
+		grpcmetakey.GRPCMetaKeyRole, strconv.Itoa(int(claims.Role)),
+	)
+
+	var req dto.BanUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	grpcReq, err := mapper.ToBanUserGRPC(req)
+	if err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		writeGRPCError(w, err)
+		return
+	}
+
+	resp, err := h.authClient.BanUser(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp := mapper.ToBanUserHTTP(resp)
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) UnbanUser(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.UnbanUser"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx = metadata.AppendToOutgoingContext(
+		ctx,
+		grpcmetakey.GRPCMetaKeyRole, strconv.Itoa(int(claims.Role)),
+
+	)
+
+	var req dto.UnBanUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	grpcReq, err := mapper.ToUnBanUserGRPC(req)
+	if err != nil {
+		h.l.Info(ctx, "invalid id", logger.String("op", op))
+		writeGRPCError(w, err)
+		return
+	}
+
+	resp, err := h.authClient.UnBanUser(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp := mapper.ToUnBanUserHTTP(resp)
+
+	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+	}
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.auth.ChangePassword"
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
+	defer cancel()
+
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		h.l.Info(ctx, "user sent invalid claims", logger.String("op", op))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx = metadata.AppendToOutgoingContext(
+		ctx,
+		grpcmetakey.GRPCMetaKeyUserID, claims.UserID.String(),
+	)
+
+	var req dto.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	grpcReq := mapper.ToChangePasswordGRPC(req)
+
+	resp, err := h.authClient.ChangePassword(ctx, grpcReq)
+	if err != nil {
+		h.l.Error(ctx, op, logger.Error(err))
+		writeGRPCError(w, err)
+		return
+	}
+
+	httpResp := mapper.ToChangePasswordHTTP(resp)
 
 	if err := writeJSON(w, http.StatusOK, httpResp); err != nil {
 		h.l.Error(ctx, op, logger.Error(err))

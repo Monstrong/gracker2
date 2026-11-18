@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/monstrong/gracker2/api-gateway/internal/clients"
 	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/handlers"
 	"github.com/monstrong/gracker2/pkg/logger"
+	
 )
 
 // TODO: Исправить: при завершении через сигнал Run() не ожидает serveErr после Shutdown.
@@ -35,12 +38,32 @@ func New(ctx context.Context) (*App, error) {
 	}
 	l.Info(ctx, "config & logger init complete")
 
+	authClient, err := clients.NewAuthClient(cfg.Services.Auth.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("init auth client: %w", err)
+	}
+	torrentClient, err := clients.NewTorrentClient(cfg.Services.Torrent.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("init torrent client: %w", err)
+	}
+	// trackerClient, err := clients.NewTrackerClient(cfg.Services.Tracker.Addr)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("init tracker client: %w", err)
+	// }
+
+	clients := []Client{authClient, torrentClient} // trackerClient
+
+	authHandler := handlers.NewAuthHandler(authClient, cfg.Services.Auth, l)
+	torrentHandler := handlers.NewTorrentHandler(torrentClient, cfg.Services.Torrent, l)
+	// trackerHandler := handlers.NewTrackerHandler(trackerClient, cfg.Services.Tracker, l)
+
 	server := newHttpServer(&cfg.Server)
 
 	return &App{
 		cfg:        cfg,
 		httpServer: server,
 		l:          l,
+		clients:    clients,
 	}, nil
 }
 
@@ -75,7 +98,8 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	a.l.Info(logCtx, "api-gateway stopped gracefully")
+	a.l.Info(logCtx, "api-gateway stopped gracefully", logger.Error(<-serveErr))
+	
 	return nil
 }
 

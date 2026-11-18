@@ -1,6 +1,8 @@
 package clients
 
 import (
+	"context"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -32,3 +34,32 @@ func NewTorrentClient(addr string) (*TorrentClient, error) {
 
 	return &TorrentClient{conn: conn, client: client}, nil
 }
+
+func (c *TorrentClient) GetTorrent(
+	ctx context.Context,
+	req *torrentv1.GetTorrentRequest,
+) (*torrentv1.GetTorrentResponse, error) {
+	return c.client.GetTorrent(ctx, req)
+}
+
+func (c *TorrentClient) CreateTorrent(
+	ctx context.Context,
+	req *torrentv1.CreateTorrentRequest,
+) (*torrentv1.CreateTorrentResponse, error) {
+	return c.client.CreateTorrent(ctx, req)
+}
+
+func (c *TorrentClient) DeleteTorrent(
+	ctx context.Context,
+	req *torrentv1.DeleteTorrentRequest,
+) (*torrentv1.DeleteTorrentResponse, error) {
+	return c.client.DeleteTorrent(ctx, req)
+}
+
+func (c *TorrentClient) ListTorrents(
+	ctx context.Context,
+	req *torrentv1.ListTorrentsRequest,
+) (*torrentv1.ListTorrentsResponse, error) {
+	return c.client.ListTorrents(ctx, req)
+}
+

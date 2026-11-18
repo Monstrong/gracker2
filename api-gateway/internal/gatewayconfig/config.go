@@ -30,6 +30,7 @@ type Config struct {
 type Services struct {
 	Auth Auth `mapstructure:"auth" yaml:"auth"`
 	Torrent Torrent `mapstructure:"torrent" yaml:"torrent"`
+	Tracker Tracker `mapstructure:"tracker" yaml:"tracker"`
 }
 
 type Auth struct {
@@ -38,6 +39,11 @@ type Auth struct {
 }
 
 type Torrent struct {
+	Addr string `mapstructure:"addr" yaml:"addr"`
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
+type Tracker struct {
 	Addr string `mapstructure:"addr" yaml:"addr"`
 	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout"`
 }
