@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
 	"github.com/monstrong/gracker2/api-gateway/internal/middleware"
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/dto"
@@ -264,18 +265,23 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *AuthHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) GetUser(w http.ResponseWriter, r *http.Request, id string) {
 	const op = "handlers.auth.GetUser"
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
 	defer cancel()
 
-	var req dto.GetUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+	uuidId, err := uuid.Parse(id)
+	if err != nil {
+		h.l.Info(ctx, "user sent invalid id", logger.String("op", op))
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+
+	req := dto.GetUserRequest{
+		UserId: uuidId,
+	}
+
 
 	grpcReq, err := mapper.ToGetUserGRPC(req)
 	if err != nil {
@@ -303,17 +309,21 @@ func (h *AuthHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *AuthHandler) AdminGetUser(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) AdminGetUser(w http.ResponseWriter, r *http.Request, id string) {
 	const op = "handlers.auth.AdminGetUser"
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.Timeout)
 	defer cancel()
 
-	var req dto.AdminGetUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.l.Info(ctx, "user sent invalid request", logger.String("op", op))
+	uuidId, err := uuid.Parse(id)
+	if err != nil {
+		h.l.Info(ctx, "user sent invalid id", logger.String("op", op))
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
+	}
+
+	req := dto.AdminGetUserRequest{
+		Id: uuidId,
 	}
 
 	claims, ok := middleware.GetClaims(r.Context())

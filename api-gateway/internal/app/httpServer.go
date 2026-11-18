@@ -5,18 +5,15 @@ import (
 	"net/http"
 
 	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
-	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi"
 )
 
-func newHttpServer(cfg *gatewayconfig.Server) *http.Server {
-	r := httpapi.NewRouter
-
+func newHttpServer(cfg *gatewayconfig.Server, handler http.Handler) *http.Server {
 	return &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Port),
-		Handler: r(),
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           handler,
 		ReadHeaderTimeout: cfg.Timeout,
 		WriteTimeout:      cfg.Timeout,
 		ReadTimeout:       cfg.Timeout,
-		IdleTimeout:       cfg.Timeout*6,
+		IdleTimeout:       cfg.Timeout * 6,
 	}
 }

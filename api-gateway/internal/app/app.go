@@ -8,9 +8,11 @@ import (
 
 	"github.com/monstrong/gracker2/api-gateway/internal/clients"
 	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
+	"github.com/monstrong/gracker2/api-gateway/internal/health"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi"
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/handlers"
+	"github.com/monstrong/gracker2/pkg/jwtparser"
 	"github.com/monstrong/gracker2/pkg/logger"
-	
 )
 
 // TODO: Исправить: при завершении через сигнал Run() не ожидает serveErr после Shutdown.
@@ -53,11 +55,27 @@ func New(ctx context.Context) (*App, error) {
 
 	clients := []Client{authClient, torrentClient} // trackerClient
 
+	tokenManager := jwtparser.NewManager(cfg.JWT_Secret)
+
 	authHandler := handlers.NewAuthHandler(authClient, cfg.Services.Auth, l)
 	torrentHandler := handlers.NewTorrentHandler(torrentClient, cfg.Services.Torrent, l)
 	// trackerHandler := handlers.NewTrackerHandler(trackerClient, cfg.Services.Tracker, l)
 
-	server := newHttpServer(&cfg.Server)
+	checker := health.NewChecker(map[string]string{
+		"auth-service":   cfg.Services.Auth.InfraAddr,
+		"torrent-service": cfg.Services.Torrent.InfraAddr,
+		// "tracker-service": cfg.Services.Tracker.InfraAddr,
+	}, cfg.ChackerTimeout)
+	
+	r := httpapi.NewRouter(
+		authHandler,
+        torrentHandler,
+        tokenManager,
+		checker,
+        l,
+	)
+	
+	server := newHttpServer(&cfg.Server, r)
 
 	return &App{
 		cfg:        cfg,
@@ -93,13 +111,21 @@ func (a *App) Run(ctx context.Context) error {
 		a.l.Info(logCtx, "shutdown signal received")
 	}
 
-	if err := a.shutdown(logCtx); err != nil {
-		a.l.Error(logCtx, "graceful shutdown failed", logger.Error(err))
-		return err
+	shutdownErr := a.shutdown(logCtx)
+
+	var servErr error = <-serveErr
+
+	if shutdownErr != nil {
+		a.l.Error(logCtx, "graceful shutdown failed", logger.Error(shutdownErr))
+		return shutdownErr
 	}
 
-	a.l.Info(logCtx, "api-gateway stopped gracefully", logger.Error(<-serveErr))
-	
+	if servErr != nil {
+		a.l.Error(logCtx, "http server failed", logger.Error(servErr))
+		return fmt.Errorf("http server: %w", servErr)
+	}
+
+	a.l.Info(logCtx, "api-gateway stopped gracefully")
 	return nil
 }
 
