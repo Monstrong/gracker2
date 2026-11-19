@@ -30,6 +30,10 @@ type L struct {
 
 type Field = zap.Field
 
+func TraceIDFromContext(ctx context.Context) (string, bool) {
+	traceID, ok := ctx.Value(LoggerTraceIDKey).(string)
+	return traceID, ok
+}
 
 func New(cfg *config.Logger) (*L, error) {
 
@@ -39,13 +43,13 @@ func New(cfg *config.Logger) (*L, error) {
 
 	switch cfg.Level {
 	case "dev", "development", "local":
-		logger, err = zap.NewDevelopment()
+		logger, err = zap.NewDevelopment(zap.AddCallerSkip(1)) 
 	case "prod", "production":
-		logger, err = zap.NewProduction()
+		logger, err = zap.NewProduction(zap.AddCallerSkip(1))
 	default:
-		logger, err = zap.NewProduction()
+		logger, err = zap.NewProduction(zap.AddCallerSkip(1))
 		invalidLevel = true
-	}
+	} // zap.AddCallerSkip(1) говорит что нужно пропустить один кадр стека (чтобы верно указать откуда логгер был вызван)
 
 	if err != nil {
 		return nil, fmt.Errorf("creating logger:%w", err)

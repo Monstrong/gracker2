@@ -244,7 +244,7 @@ func (s *UserService) DeleteUser(ctx context.Context, id uuid.UUID, senderRole m
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	}
 
-	if senderRole == models.OwnerRole {
+	if currentRole == models.OwnerRole {
 		return false, fmt.Errorf("%s: %w", op, errs.ErrPermissionDenied)
 	}
 
@@ -316,63 +316,4 @@ func (s *UserService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassw
 	}
 
 	return true, nil
-}
-
-func validateAvatarURL(url string) error {
-	return nil
-}
-
-func validateBio(bio string) error {
-	return nil
-}
-func validateID(id uuid.UUID) error {
-	return nil
-}
-
-func validateName(name string) error {
-	return nil
-}
-
-func validateEmail(email string) error {
-	return nil
-}
-
-func validatePassword(password string) error {
-	// validatePassword: len > 72
-	return nil
-}
-
-func validateRole(role models.Role) error {
-	return nil
-}
-
-func validatePremiumType(premium models.PremiumType) error {
-	return nil
-}
-
-func validateUserPatch(u *models.UserPatch) error {
-	if u == nil || (u.AvatarURL == nil && u.Bio == nil && u.Name == nil && u.Email == nil) {
-		return errs.ErrUserPatchEmpty
-	}
-	if u.AvatarURL != nil {
-		if err := validateAvatarURL(*u.AvatarURL); err != nil {
-			return err
-		}
-	}
-	if u.Bio != nil {
-		if err := validateBio(*u.Bio); err != nil {
-			return err
-		}
-	}
-	if u.Name != nil {
-		if err := validateName(*u.Name); err != nil {
-			return err
-		}
-	}
-	if u.Email != nil {
-		if err := validateEmail(*u.Email); err != nil {
-			return err
-		}
-	}
-	return nil
 }

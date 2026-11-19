@@ -6,17 +6,26 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/monstrong/gracker2/api-gateway/internal/clients"
 	"github.com/monstrong/gracker2/api-gateway/internal/gatewayconfig"
+	"github.com/monstrong/gracker2/api-gateway/internal/health"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi"
+	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/handlers"
+	"github.com/monstrong/gracker2/pkg/jwtparser"
 	"github.com/monstrong/gracker2/pkg/logger"
 )
 
-// TODO: при завершении через сигнал Run() не ожидает serveErr после Shutdown. 
-// мне гпт сказал что надо это как-то исправить
+// TODO: Исправить: при завершении через сигнал Run() не ожидает serveErr после Shutdown.
 
 type App struct {
 	cfg        *gatewayconfig.Config
 	httpServer *http.Server
 	l          logger.Logger
+	clients    []Client
+}
+
+type Client interface { // io.Closer
+	Close() error
 }
 
 func New(ctx context.Context) (*App, error) {
@@ -31,12 +40,48 @@ func New(ctx context.Context) (*App, error) {
 	}
 	l.Info(ctx, "config & logger init complete")
 
-	server := newHttpServer(&cfg.Server)
+	authClient, err := clients.NewAuthClient(cfg.Services.Auth.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("init auth client: %w", err)
+	}
+	torrentClient, err := clients.NewTorrentClient(cfg.Services.Torrent.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("init torrent client: %w", err)
+	}
+	// trackerClient, err := clients.NewTrackerClient(cfg.Services.Tracker.Addr)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("init tracker client: %w", err)
+	// }
+
+	clients := []Client{authClient, torrentClient} // trackerClient
+
+	tokenManager := jwtparser.NewManager(cfg.JWT_Secret)
+
+	authHandler := handlers.NewAuthHandler(authClient, cfg.Services.Auth, l)
+	torrentHandler := handlers.NewTorrentHandler(torrentClient, cfg.Services.Torrent, l)
+	// trackerHandler := handlers.NewTrackerHandler(trackerClient, cfg.Services.Tracker, l)
+
+	checker := health.NewChecker(map[string]string{
+		"auth-service":   cfg.Services.Auth.InfraAddr,
+		"torrent-service": cfg.Services.Torrent.InfraAddr,
+		// "tracker-service": cfg.Services.Tracker.InfraAddr,
+	}, cfg.ChackerTimeout)
+	
+	r := httpapi.NewRouter(
+		authHandler,
+        torrentHandler,
+        tokenManager,
+		checker,
+        l,
+	)
+	
+	server := newHttpServer(&cfg.Server, r)
 
 	return &App{
 		cfg:        cfg,
 		httpServer: server,
 		l:          l,
+		clients:    clients,
 	}, nil
 }
 
@@ -45,7 +90,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		a.l.Info(logCtx, "http infra server starting")
+		a.l.Info(logCtx, "api-gateway server starting")
 
 		err := a.httpServer.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {
@@ -57,40 +102,56 @@ func (a *App) Run(ctx context.Context) error {
 	select {
 	case err := <-serveErr:
 		if err != nil {
-			a.l.Error(logCtx, "http server failed", logger.Error(err))
-			return fmt.Errorf("http server: %w", err)
+			a.l.Error(logCtx, "api-gateway server failed", logger.Error(err))
+			return fmt.Errorf("api-gateway server: %w", err)
 		}
-		a.l.Info(logCtx, "http server stopped")
+		a.l.Info(logCtx, "api-gateway server stopped")
 		return nil
 	case <-ctx.Done():
 		a.l.Info(logCtx, "shutdown signal received")
 	}
 
-	if err := a.shutdown(logCtx); err != nil {
-		a.l.Error(logCtx, "graceful shutdown failed", logger.Error(err))
-		return err
+	shutdownErr := a.shutdown(logCtx)
+
+	var servErr error = <-serveErr
+
+	if shutdownErr != nil {
+		a.l.Error(logCtx, "graceful shutdown failed", logger.Error(shutdownErr))
+		return shutdownErr
+	}
+
+	if servErr != nil {
+		a.l.Error(logCtx, "http server failed", logger.Error(servErr))
+		return fmt.Errorf("http server: %w", servErr)
 	}
 
 	a.l.Info(logCtx, "api-gateway stopped gracefully")
-    return nil
+	return nil
 }
 
 // graceful shutdown
 func (a *App) shutdown(ctx context.Context) error {
-    a.l.Info(ctx, "shutting down")
+	a.l.Info(ctx, "shutting down")
 
-    shutCtx, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
-    defer cancel()
+	shutCtx, cancel := context.WithTimeout(context.Background(), a.cfg.GracefulShutdownTimeout)
+	defer cancel()
 
-    if err := a.httpServer.Shutdown(shutCtx); err != nil {
-        _ = a.httpServer.Close()
-        return fmt.Errorf("http server shutdown: %w", err)
-    }
+	if err := a.httpServer.Shutdown(shutCtx); err != nil {
+		_ = a.httpServer.Close()
+		return fmt.Errorf("http server shutdown: %w", err)
+	}
 
-    return nil
+	return nil
 }
 func (a *App) Close() error {
 	a.l.Sync()
 
-	return nil
+	var errs []error 
+	// закрывает все соединения клиентов
+    for _, c := range a.clients {
+        if err := c.Close(); err != nil {
+            errs = append(errs, err)
+        }
+    }
+    return errors.Join(errs...)
 }

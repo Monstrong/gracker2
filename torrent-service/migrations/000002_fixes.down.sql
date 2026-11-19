@@ -1,0 +1,6 @@
+ALTER TABLE torrents ALTER COLUMN description DROP NOT NULL;
+ALTER TABLE torrents ALTER COLUMN description DROP DEFAULT;
+
+ALTER TABLE torrents
+    ALTER COLUMN created_at TYPE TIMESTAMP,
+    ALTER COLUMN updated_at TYPE TIMESTAMP;

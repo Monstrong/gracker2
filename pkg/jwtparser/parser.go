@@ -2,7 +2,6 @@ package jwtparser
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -15,22 +14,18 @@ type TokenManager interface {
 
 type Manager struct {
 	signingKey      string
-	accessTokenTTL  time.Duration
-	refreshTokenTTL time.Duration
 }
 
 type Claims struct {
-	UserID  uuid.UUID             `json:"user_id"`
+	UserID  uuid.UUID          `json:"user_id"`
 	Role    domain.Role        `json:"role"`
 	Premium domain.PremiumType `json:"premium"`
 	jwt.RegisteredClaims
 }
 
-func NewManager(signingKey string, accessTokenTTL time.Duration, refreshTokenTTL time.Duration) *Manager {
+func NewManager(signingKey string) *Manager {
 	return &Manager{
 		signingKey:      signingKey,
-		accessTokenTTL:  accessTokenTTL,
-		refreshTokenTTL: refreshTokenTTL,
 	}
 }
 

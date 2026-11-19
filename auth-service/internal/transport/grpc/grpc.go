@@ -6,14 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/monstrong/gracker2/auth-service/internal/models"
+	"github.com/monstrong/gracker2/pkg/contracts/grpcmetakey"
 	"github.com/monstrong/gracker2/pkg/errs"
 	pb "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // <-- при смене версии изменить
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-const UserIDKey = "x-user-id"
-const SenderRoleKey = "x-sender-role"
 
 func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	id, err := s.s.Register(ctx, in.GetName(), in.GetEmail(), in.GetPassword())
@@ -59,7 +57,10 @@ func (s *Server) Logout(ctx context.Context, in *pb.LogoutRequest) (*pb.LogoutRe
 
 // LogoutEverywhere wants UserID in metadata
 func (s *Server) LogoutEverywhere(ctx context.Context, in *pb.LogoutEverywhereRequest) (*pb.LogoutEverywhereResponse, error) {
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	userID, err := checkIDfromMD(MD)
 	if err != nil {
@@ -83,9 +84,12 @@ func (s *Server) LogoutEverywhere(ctx context.Context, in *pb.LogoutEverywhereRe
 func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.RoleUpdateResponse, error) {
 	id, err := uuid.Parse(in.GetTargetUserId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -103,9 +107,12 @@ func (s *Server) RoleUpdate(ctx context.Context, in *pb.RoleUpdateRequest) (*pb.
 func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest) (*pb.PremiumUpdateResponse, error) {
 	id, err := uuid.Parse(in.GetTargetUserId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -121,7 +128,10 @@ func (s *Server) PremiumUpdate(ctx context.Context, in *pb.PremiumUpdateRequest)
 
 // GetMe wants UserID in metadata
 func (s *Server) GetMe(ctx context.Context, in *pb.GetMeRequest) (*pb.GetMeResponse, error) {
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	id, err := checkIDfromMD(MD)
 	if err != nil {
@@ -138,7 +148,7 @@ func (s *Server) GetMe(ctx context.Context, in *pb.GetMeRequest) (*pb.GetMeRespo
 func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 	user, err := s.s.GetUser(ctx, id)
 	if err != nil {
@@ -151,10 +161,13 @@ func (s *Server) GetUser(ctx context.Context, in *pb.GetUserRequest) (*pb.GetUse
 func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (*pb.AdminGetUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD) 
 	if err != nil {
@@ -169,7 +182,10 @@ func (s *Server) AdminGetUser(ctx context.Context, in *pb.AdminGetUserRequest) (
 
 // UpdateUser wants SenderID in metadata
 func (s *Server) UpdateUser(ctx context.Context, in *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	userID, err := checkIDfromMD(MD)
 	if err != nil {
@@ -194,10 +210,13 @@ func (s *Server) UpdateUser(ctx context.Context, in *pb.UpdateUserRequest) (*pb.
 func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -220,10 +239,13 @@ func (s *Server) DeleteUser(ctx context.Context, in *pb.DeleteUserRequest) (*pb.
 func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -241,10 +263,13 @@ func (s *Server) BanUser(ctx context.Context, in *pb.BanUserRequest) (*pb.BanUse
 func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.UnBanUserResponse, error) {
 	id, err := uuid.Parse(in.GetId())
 	if err != nil {
-		return nil, &errs.ValidationError{Field: UserIDKey, Reason: "invalid user id format"}
+		return nil, &errs.ValidationError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 	}
 
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	SenderRole, err := checkSenderRolefromMD(MD)
 	if err != nil {
@@ -262,7 +287,10 @@ func (s *Server) UnBanUser(ctx context.Context, in *pb.UnBanUserRequest) (*pb.Un
 // ChangePassword wants UserID in metadata
 func (s *Server) ChangePassword(ctx context.Context, in *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
 	
-	MD, _ := metadata.FromIncomingContext(ctx)
+	MD, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errs.ErrMissingMetadata
+	}
 
 	userID, err := checkIDfromMD(MD)
 	if err != nil {
@@ -277,30 +305,30 @@ func (s *Server) ChangePassword(ctx context.Context, in *pb.ChangePasswordReques
 }
 
 func checkIDfromMD(MD metadata.MD) (userID uuid.UUID, err error) {
-	vals := MD.Get(UserIDKey)
+	vals := MD.Get(grpcmetakey.GRPCMetaKeyUserID)
 
 	if len(vals) > 0 {
 		if userID, err = uuid.Parse(vals[0]); err != nil {
-			return uuid.Nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "invalid user id format"}
+			return uuid.Nil, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "invalid user id format"}
 		}
 	} else {
-		return uuid.Nil, &errs.GatewayWrongFieldError{Field: UserIDKey, Reason: "empty user id"}
+		return uuid.Nil, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyUserID, Reason: "empty user id"}
 	}
 
 	return
 }
 
 func checkSenderRolefromMD(MD metadata.MD) (SenderRole models.Role, err error) {
-	vals := MD.Get(SenderRoleKey)
+	vals := MD.Get(grpcmetakey.GRPCMetaKeyRole)
 
 	if len(vals) > 0 {
 		roleValue, err := strconv.ParseInt(vals[0], 10, 8)
 		if err != nil {
-			return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: SenderRoleKey, Reason: "invalid role format"}
+			return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyRole, Reason: "invalid role format"}
 		}
 		SenderRole = models.Role(roleValue)
 	} else {
-		return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: SenderRoleKey, Reason: "empty role"}
+		return models.RoleUnspecified, &errs.GatewayWrongFieldError{Field: grpcmetakey.GRPCMetaKeyRole, Reason: "empty role"}
 	}
 
 	return
