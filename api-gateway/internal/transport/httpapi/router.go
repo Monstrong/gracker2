@@ -7,7 +7,6 @@ import (
 	"github.com/monstrong/gracker2/api-gateway/internal/health"
 	"github.com/monstrong/gracker2/api-gateway/internal/middleware"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/handlers"
 	"github.com/monstrong/gracker2/pkg/jwtparser"
 	"github.com/monstrong/gracker2/pkg/logger"
@@ -22,7 +21,6 @@ func NewRouter(
 ) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(chimiddleware.RequestID)
 	r.Use(middleware.RequestLogger(l))
 	r.Use(middleware.Recoverer(l))
 

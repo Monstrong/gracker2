@@ -20,5 +20,5 @@ services:
 logger:
   level: local
 
-chacker_timeout: 2s
+chacker_timeout: 3s
 graceful_shutdown_timeout: 15s

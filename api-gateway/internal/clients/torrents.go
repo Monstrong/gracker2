@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/monstrong/gracker2/api-gateway/internal/clientinterceptors"
 	torrentv1 "github.com/monstrong/gracker2/proto/gen/go/torrent/v1"
 )
 
@@ -25,6 +26,7 @@ func NewTorrentClient(addr string) (*TorrentClient, error) {
 		grpc.WithTransportCredentials(
 			insecure.NewCredentials(),
 		),
+		grpc.WithUnaryInterceptor(clientinterceptors.TraceIDClientInterceptor()),
 	)
 	if err != nil {
 		return nil, err

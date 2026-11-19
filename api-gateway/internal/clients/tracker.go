@@ -23,6 +23,7 @@ package clients
 // 		grpc.WithTransportCredentials(
 // 			insecure.NewCredentials(),
 // 		),
+// 		grpc.WithUnaryInterceptor(clientinterceptors.TraceIDClientInterceptor()),
 // 	)
 // 	if err != nil {
 // 		return nil, err

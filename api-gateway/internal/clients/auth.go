@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/monstrong/gracker2/api-gateway/internal/clientinterceptors"
 	authv1 "github.com/monstrong/gracker2/proto/gen/go/auth/v1" // при смене версии сменить версию
 )
 
@@ -24,6 +25,7 @@ func NewAuthClient(addr string) (*AuthGrpcClient, error) {
 		grpc.WithTransportCredentials(
 			insecure.NewCredentials(),
 		),
+		grpc.WithUnaryInterceptor(clientinterceptors.TraceIDClientInterceptor()), // интерсептор вставляющий traceID в metadata
 	)
 	if err != nil {
 		return nil, err

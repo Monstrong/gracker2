@@ -30,6 +30,10 @@ type L struct {
 
 type Field = zap.Field
 
+func TraceIDFromContext(ctx context.Context) (string, bool) {
+	traceID, ok := ctx.Value(LoggerTraceIDKey).(string)
+	return traceID, ok
+}
 
 func New(cfg *config.Logger) (*L, error) {
 
