@@ -1,21 +1,21 @@
 server:
   name: api-gateway
-  port: 8082
+  port: 8090
   timeout: 5s
 
 services:
   auth:
     addr: "localhost:50052"
     timeout: 5s
-    infra_addr:
+    infra_addr: "localhost:8081"
   torrent:
     addr: "localhost:50051"
     timeout: 5s
-    infra_addr:
+    infra_addr: "localhost:8080"
   tracker:
     addr: "localhost:50054"
     timeout: 5s
-    infra_addr:
+    infra_addr: "localhost:8082"
 
 logger:
   level: local

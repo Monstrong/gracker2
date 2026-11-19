@@ -38,7 +38,7 @@ type RefreshResponse struct {
 
 type RoleUpdateRequest struct {
 	TargetUserId uuid.UUID   `json:"target_user_id"`
-	NewRole      domain.Role `json:"new_role"`
+	NewRole      domain.Role `json:"new_role" swaggertype:"integer"`
 }
 
 type RoleUpdateResponse struct {
@@ -47,7 +47,7 @@ type RoleUpdateResponse struct {
 
 type PremiumUpdateRequest struct {
 	TargetUserId uuid.UUID          `json:"target_user_id"`
-	NewPremium   domain.PremiumType `json:"new_premium"`
+	NewPremium   domain.PremiumType `json:"new_premium" swaggertype:"integer"`
 }
 
 type PremiumUpdateResponse struct {
@@ -125,8 +125,8 @@ type User struct {
 	Id        uuid.UUID          `json:"id"`
 	Name      string             `json:"name"`
 	Email     string             `json:"email"`
-	Role      domain.Role        `json:"role"`
-	Premium   domain.PremiumType `json:"premium"`
+	Role      domain.Role        `json:"role" swaggertype:"integer"`
+	Premium   domain.PremiumType `json:"premium" swaggertype:"integer"`
 	AvatarUrl string             `json:"avatar_url"`
 	Bio       string             `json:"bio"`
 	CreatedAt time.Time          `json:"created_at"`
@@ -136,8 +136,8 @@ type User struct {
 type PublicUser struct {
 	Id        uuid.UUID          `json:"id"`
 	Name      string             `json:"name"`
-	Role      domain.Role        `json:"role"`
-	Premium   domain.PremiumType `json:"premium"`
+	Role      domain.Role        `json:"role" swaggertype:"integer"`
+	Premium   domain.PremiumType `json:"premium" swaggertype:"integer"`
 	AvatarUrl string             `json:"avatar_url"`
 	Bio       string             `json:"bio"`
 	CreatedAt time.Time          `json:"created_at"`

@@ -10,13 +10,18 @@ import (
 	"github.com/monstrong/gracker2/api-gateway/internal/transport/httpapi/handlers"
 	"github.com/monstrong/gracker2/pkg/jwtparser"
 	"github.com/monstrong/gracker2/pkg/logger"
+
+	_ "github.com/monstrong/gracker2/api-gateway/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// swag init -g docs.go
+// сгенерить доки сваггера
 func NewRouter(
 	authHandler *handlers.AuthHandler,
 	torrentHandler *handlers.TorrentHandler,
 	tokenManager jwtparser.TokenManager,
-    chacker *health.Checker,
+	chacker *health.Checker,
 	l logger.Logger,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -25,39 +30,41 @@ func NewRouter(
 	r.Use(middleware.Recoverer(l))
 
 	r.Get("/health", Health)
-    r.Get("/ready", Ready(chacker))
+	r.Get("/ready", Ready(chacker))
 
-    // Public auth routes
-    r.Route("/auth", func(r chi.Router) {
-        r.Post("/register", authHandler.Register)
-        r.Post("/login", authHandler.Login)
-        r.Post("/refresh", authHandler.Refresh)
-        r.Post("/logout", authHandler.Logout)
-    })
+	r.Get("/swagger/*", httpSwagger.Handler())
 
-    // Public user routes
-    r.Get("/users/{id}", func(w http.ResponseWriter, r *http.Request) {
-        authHandler.GetUser(w, r, chi.URLParam(r, "id"))
-    })
+	// Public auth routes
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/register", authHandler.Register)
+		r.Post("/login", authHandler.Login)
+		r.Post("/refresh", authHandler.Refresh)
+		r.Post("/logout", authHandler.Logout)
+	})
 
-    // Authenticated routes
-    r.Group(func(r chi.Router) {
-        r.Use(middleware.AuthMiddleware(tokenManager))
+	// Public user routes
+	r.Get("/users/{id}", func(w http.ResponseWriter, r *http.Request) {
+		authHandler.GetUser(w, r, chi.URLParam(r, "id"))
+	})
 
-        r.Post("/auth/logout-all", authHandler.LogoutEverywhere)
+	// Authenticated routes
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(tokenManager))
 
-        r.Get("/users/me", authHandler.GetMe)
-        r.Patch("/users/me", authHandler.UpdateUser)
-        r.Patch("/users/me/password", authHandler.ChangePassword)
-        r.Delete("/users", authHandler.DeleteUser)
-        // Admin routes
-        r.Get("/admin/users/{id}", func(w http.ResponseWriter, r *http.Request) {
-            authHandler.AdminGetUser(w, r, chi.URLParam(r, "id"))
-        })
-        r.Patch("/admin/users/role", authHandler.RoleUpdate)
-        r.Post("/admin/users/ban", authHandler.BanUser)
-        r.Delete("/admin/users/ban", authHandler.UnbanUser)
-    })
+		r.Post("/auth/logout-all", authHandler.LogoutEverywhere)
+
+		r.Get("/users/me", authHandler.GetMe)
+		r.Patch("/users/me", authHandler.UpdateUser)
+		r.Patch("/users/me/password", authHandler.ChangePassword)
+		r.Delete("/users", authHandler.DeleteUser)
+		// Admin routes
+		r.Get("/admin/users/{id}", func(w http.ResponseWriter, r *http.Request) {
+			authHandler.AdminGetUser(w, r, chi.URLParam(r, "id"))
+		})
+		r.Patch("/admin/users/role", authHandler.RoleUpdate)
+		r.Post("/admin/users/ban", authHandler.BanUser)
+		r.Delete("/admin/users/ban", authHandler.UnbanUser)
+	})
 
 	return r
 }
