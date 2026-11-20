@@ -15,8 +15,6 @@ import (
 	"github.com/monstrong/gracker2/pkg/logger"
 )
 
-// TODO: Исправить: при завершении через сигнал Run() не ожидает serveErr после Shutdown.
-
 type App struct {
 	cfg        *gatewayconfig.Config
 	httpServer *http.Server

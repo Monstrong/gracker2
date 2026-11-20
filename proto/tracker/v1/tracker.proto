@@ -1,0 +1,4 @@
+syntax = "proto3";
+package tracker.v1;
+option go_package = "github.com/monstrong/gracker2/proto/gen/go/tracker/v1";
+

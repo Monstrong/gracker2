@@ -7,4 +7,5 @@ use (
 	./proto
 	./testing_field
 	./torrent-service
+	./tracker-service
 )
