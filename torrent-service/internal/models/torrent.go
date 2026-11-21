@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Torrent struct {
@@ -18,7 +19,14 @@ type Torrent struct {
 	UpdatedAt   time.Time `db:"updated_at"`
 }
 
+type TorrentPatch struct {
+	Name        string    `json:"title"`
+	Description string    `json:"description"`
+	InfoHash    string    `json:"info_hash"`
+	CategoryID  uuid.UUID `json:"category_id"`
+}
+
 const (
-	MaxLimit = 200
+	MaxLimit  = 200
 	MaxOffset = 1000000
 )

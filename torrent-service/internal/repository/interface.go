@@ -12,4 +12,6 @@ type Repository interface {
 	List(ctx context.Context, limit, offset int) ([]*models.Torrent, error)
 	Create(ctx context.Context, torrent *models.Torrent) (*models.Torrent, error)
 	Delete(ctx context.Context, id uuid.UUID) (bool, error)
+
+	GetTorrentAuthorId(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 }

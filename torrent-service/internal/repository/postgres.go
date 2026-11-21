@@ -23,6 +23,36 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	}
 }
 
+func (r *PostgresRepository) GetTorrentStatus(ctx context.Context, id uuid.UUID) (int, error) {
+	const op = "repo.postgres.gettorrentstatus"
+
+	var status int
+	query := `SELECT status FROM torrents WHERE id = &1`
+	err := r.db.QueryRow(ctx, query, id).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return -1, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return -1, fmt.Errorf("%s: %w", op, err)
+	}
+	return status, nil
+}
+
+func (r *PostgresRepository) GetTorrentAuthorId(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	const op = "repo.postgres.gettorrentauthorid"
+
+	var authorID uuid.UUID
+	query := `SELECT author_id FROM torrents WHERE id = $1`
+	err := r.db.QueryRow(ctx, query, id).Scan(&authorID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return authorID, nil
+}
+
 func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*models.Torrent, error) {
 	const op = "repo.postgres.create"
 	query := `

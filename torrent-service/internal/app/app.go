@@ -92,7 +92,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// http-сервер (health, ready, metrics)
 	g.Go(func() error {
-		a.l.Info(logCtx, "http infra server starting")
+		a.l.Info(logCtx, "http infra server starting", logger.Int("port", a.cfg.Infra.Port))
 
 		err := a.httpServer.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {

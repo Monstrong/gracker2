@@ -88,7 +88,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		a.l.Info(logCtx, "api-gateway server starting")
+		a.l.Info(logCtx, "api-gateway server starting", logger.Int("port", a.cfg.Server.Port))
 
 		err := a.httpServer.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {

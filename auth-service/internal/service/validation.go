@@ -124,17 +124,31 @@ func validateAvatarURL(raw string) error {
 }
 
 func validateRole(role models.Role) error {
-	if role <= models.RoleUnspecified || role > models.BillingRole {
-		return newValErr("role", "unknown role")
-	}
-	return nil
+    switch role {
+    case models.BannedRole,
+        models.UserRole,
+        models.ModeratorRole,
+        models.AdminRole,
+        models.OwnerRole:
+        return nil
+    case models.RoleUnspecified:
+        return newValErr("role", "role is unspecified")
+    case models.BillingRole:
+        return nil
+    default:
+        return newValErr("role", "unknown role")
+    }
 }
 
 func validatePremiumType(p models.PremiumType) error {
-	if p != models.Free && p != models.Premium {
-		return newValErr("premium", "unknown premium type")
-	}
-	return nil
+    switch p {
+    case models.Free, models.Premium:
+        return nil
+    case models.PremiumUnspecified:
+        return newValErr("premium", "premium type is unspecified")
+    default:
+        return newValErr("premium", "unknown premium type")
+    }
 }
 func validateUserPatch(u *models.UserPatch) error {
 	if u == nil {
