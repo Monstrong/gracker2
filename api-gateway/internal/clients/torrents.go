@@ -65,3 +65,24 @@ func (c *TorrentClient) ListTorrents(
 	return c.client.ListTorrents(ctx, req)
 }
 
+func (c *TorrentClient) UpdateTorrent(
+	ctx context.Context,
+	req *torrentv1.UpdateTorrentRequest,
+) (*torrentv1.UpdateTorrentResponse, error) {
+	return c.client.UpdateTorrent(ctx, req)
+}
+
+func (c *TorrentClient) UpdateStatus(
+	ctx context.Context,
+	req *torrentv1.UpdateStatusRequest,
+) (*torrentv1.UpdateStatusResponse, error) {
+	return c.client.UpdateStatus(ctx, req)
+}
+
+func (c *TorrentClient) ListCategory(
+	ctx context.Context,
+	req *torrentv1.ListCategoryRequest,
+) (*torrentv1.ListCategoryResponse, error) {
+	return c.client.ListCategory(ctx, req)
+}
+

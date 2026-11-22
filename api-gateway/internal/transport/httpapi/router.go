@@ -47,6 +47,10 @@ func NewRouter(
 		authHandler.GetUser(w, r, chi.URLParam(r, "id"))
 	})
 
+	// Public torrent routes
+	r.Get("/torrents", torrentHandler.ListTorrents)
+	r.Get("/categories", torrentHandler.ListCategory)
+
 	// Authenticated routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(tokenManager))
@@ -57,6 +61,14 @@ func NewRouter(
 		r.Patch("/users/me", authHandler.UpdateUser)
 		r.Patch("/users/me/password", authHandler.ChangePassword)
 		r.Delete("/users", authHandler.DeleteUser)
+
+		// Torrents
+		r.Get("/torrents/{id}", torrentHandler.GetTorrent)
+		r.Post("/torrents", torrentHandler.CreateTorrent)
+		r.Patch("/torrents/{id}", torrentHandler.UpdateTorrent)
+		r.Delete("/torrents/{id}", torrentHandler.DeleteTorrent)
+		r.Patch("/torrents/{id}/status", torrentHandler.UpdateStatus)
+
 		// Admin routes
 		r.Get("/admin/users/{id}", func(w http.ResponseWriter, r *http.Request) {
 			authHandler.AdminGetUser(w, r, chi.URLParam(r, "id"))
