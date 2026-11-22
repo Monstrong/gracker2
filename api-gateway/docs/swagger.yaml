@@ -15,6 +15,15 @@ definitions:
       banned:
         type: boolean
     type: object
+  dto.Category:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: string
+    type: object
   dto.ChangePasswordRequest:
     properties:
       new_password:
@@ -25,6 +34,27 @@ definitions:
   dto.ChangePasswordResponse:
     properties:
       changed:
+        type: boolean
+    type: object
+  dto.CreateTorrentRequest:
+    properties:
+      category_id:
+        type: string
+      description:
+        type: string
+      info_hash:
+        type: string
+      name:
+        type: string
+    type: object
+  dto.CreateTorrentResponse:
+    properties:
+      torrent:
+        $ref: '#/definitions/dto.Torrent'
+    type: object
+  dto.DeleteTorrentResponse:
+    properties:
+      deleted:
         type: boolean
     type: object
   dto.DeleteUserRequest:
@@ -47,10 +77,29 @@ definitions:
       user:
         $ref: '#/definitions/dto.User'
     type: object
+  dto.GetTorrentResponse:
+    properties:
+      torrent:
+        $ref: '#/definitions/dto.Torrent'
+    type: object
   dto.GetUserResponse:
     properties:
       user:
         $ref: '#/definitions/dto.PublicUser'
+    type: object
+  dto.ListCategoryResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/dto.Category'
+        type: array
+    type: object
+  dto.ListTorrentsResponse:
+    properties:
+      torrents:
+        items:
+          $ref: '#/definitions/dto.Torrent'
+        type: array
     type: object
   dto.LoginRequest:
     properties:
@@ -128,6 +177,29 @@ definitions:
       updated:
         type: boolean
     type: object
+  dto.Torrent:
+    properties:
+      author_id:
+        type: string
+      category_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      downloads:
+        type: integer
+      id:
+        type: string
+      info_hash:
+        type: string
+      name:
+        type: string
+      status:
+        type: integer
+      updated_at:
+        type: string
+    type: object
   dto.UnBanUserRequest:
     properties:
       id:
@@ -137,6 +209,32 @@ definitions:
     properties:
       unbanned:
         type: boolean
+    type: object
+  dto.UpdateStatusRequest:
+    properties:
+      new_status:
+        type: integer
+    type: object
+  dto.UpdateStatusResponse:
+    properties:
+      updated:
+        type: boolean
+    type: object
+  dto.UpdateTorrentRequest:
+    properties:
+      category_id:
+        type: string
+      description:
+        type: string
+      info_hash:
+        type: string
+      name:
+        type: string
+    type: object
+  dto.UpdateTorrentResponse:
+    properties:
+      torrent:
+        $ref: '#/definitions/dto.Torrent'
     type: object
   dto.UpdateUserRequest:
     properties:
@@ -510,6 +608,22 @@ paths:
       summary: Register a new user
       tags:
       - Auth
+  /categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ListCategoryResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: List torrent categories
+      tags:
+      - Categories
   /health:
     get:
       description: Checks whether the API Gateway process is running
@@ -541,6 +655,223 @@ paths:
       summary: Readiness check
       tags:
       - Health
+  /torrents:
+    get:
+      parameters:
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ListTorrentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: List torrents
+      tags:
+      - Torrents
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Torrent data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTorrentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CreateTorrentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create torrent
+      tags:
+      - Torrents
+  /torrents/{id}:
+    delete:
+      parameters:
+      - description: Torrent UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DeleteTorrentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete torrent
+      tags:
+      - Torrents
+    get:
+      parameters:
+      - description: Torrent UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GetTorrentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get torrent by ID
+      tags:
+      - Torrents
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Torrent UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Torrent update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTorrentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UpdateTorrentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update torrent
+      tags:
+      - Torrents
+  /torrents/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Torrent UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UpdateStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update torrent status
+      tags:
+      - Torrents
   /users:
     delete:
       consumes:

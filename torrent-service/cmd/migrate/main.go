@@ -51,6 +51,18 @@ func main() {
 			l.Error("add number of steps")
 			os.Exit(1)
 		}
+	case "force":
+		if len(os.Args) > 2 && os.Args[2] != "" {
+			v, parseErr := strconv.Atoi(os.Args[2])
+			if parseErr != nil {
+				l.Error("error converting version to int", slog.String("error", parseErr.Error()))
+				os.Exit(1)
+			}
+			err = m.Force(v)
+		} else {
+			l.Error("add version to force")
+			os.Exit(1)
+		}
 	default:
 		l.Error("wrong command")
 		os.Exit(1)
@@ -64,4 +76,3 @@ func main() {
 		}
 	}
 }
-

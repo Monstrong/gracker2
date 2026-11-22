@@ -72,6 +72,7 @@ func New(ctx context.Context) (*App, error) {
 		checker,
         l,
 	)
+
 	
 	server := newHttpServer(&cfg.Server, r)
 
@@ -88,11 +89,16 @@ func (a *App) Run(ctx context.Context) error {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		a.l.Info(logCtx, "api-gateway server starting", logger.Int("port", a.cfg.Server.Port))
+		swaggerURL := fmt.Sprintf("http://localhost:%d/swagger/index.html", a.cfg.Server.Port)
+
+		a.l.Info(logCtx, "api-gateway server starting",
+			logger.Int("port", a.cfg.Server.Port),
+		)
+		a.l.Info(logCtx, "Swagger UI available at "+swaggerURL)
 
 		err := a.httpServer.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {
-			err = nil // штатное завершение
+			err = nil
 		}
 		serveErr <- err
 	}()
