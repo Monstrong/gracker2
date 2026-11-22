@@ -22,6 +22,302 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ListCategoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCategoryRequest) Reset() {
+	*x = ListCategoryRequest{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCategoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCategoryRequest) ProtoMessage() {}
+
+func (x *ListCategoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCategoryRequest.ProtoReflect.Descriptor instead.
+func (*ListCategoryRequest) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{0}
+}
+
+type ListCategoryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Categories    []*Category            `protobuf:"bytes,1,rep,name=categories,proto3" json:"categories,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCategoryResponse) Reset() {
+	*x = ListCategoryResponse{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCategoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCategoryResponse) ProtoMessage() {}
+
+func (x *ListCategoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCategoryResponse.ProtoReflect.Descriptor instead.
+func (*ListCategoryResponse) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ListCategoryResponse) GetCategories() []*Category {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+type UpdateTorrentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	InfoHash      *string                `protobuf:"bytes,4,opt,name=info_hash,json=infoHash,proto3,oneof" json:"info_hash,omitempty"`
+	CategoryId    *string                `protobuf:"bytes,5,opt,name=category_id,json=categoryId,proto3,oneof" json:"category_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTorrentRequest) Reset() {
+	*x = UpdateTorrentRequest{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTorrentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTorrentRequest) ProtoMessage() {}
+
+func (x *UpdateTorrentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTorrentRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTorrentRequest) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *UpdateTorrentRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateTorrentRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateTorrentRequest) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+func (x *UpdateTorrentRequest) GetInfoHash() string {
+	if x != nil && x.InfoHash != nil {
+		return *x.InfoHash
+	}
+	return ""
+}
+
+func (x *UpdateTorrentRequest) GetCategoryId() string {
+	if x != nil && x.CategoryId != nil {
+		return *x.CategoryId
+	}
+	return ""
+}
+
+type UpdateTorrentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Torrent       *Torrent               `protobuf:"bytes,1,opt,name=torrent,proto3" json:"torrent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTorrentResponse) Reset() {
+	*x = UpdateTorrentResponse{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTorrentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTorrentResponse) ProtoMessage() {}
+
+func (x *UpdateTorrentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTorrentResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTorrentResponse) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *UpdateTorrentResponse) GetTorrent() *Torrent {
+	if x != nil {
+		return x.Torrent
+	}
+	return nil
+}
+
+type UpdateStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TorrentId     string                 `protobuf:"bytes,1,opt,name=torrent_id,json=torrentId,proto3" json:"torrent_id,omitempty"`
+	NewStatus     int32                  `protobuf:"varint,2,opt,name=new_status,json=newStatus,proto3" json:"new_status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateStatusRequest) Reset() {
+	*x = UpdateStatusRequest{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateStatusRequest) ProtoMessage() {}
+
+func (x *UpdateStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateStatusRequest.ProtoReflect.Descriptor instead.
+func (*UpdateStatusRequest) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UpdateStatusRequest) GetTorrentId() string {
+	if x != nil {
+		return x.TorrentId
+	}
+	return ""
+}
+
+func (x *UpdateStatusRequest) GetNewStatus() int32 {
+	if x != nil {
+		return x.NewStatus
+	}
+	return 0
+}
+
+type UpdateStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Updated       bool                   `protobuf:"varint,1,opt,name=updated,proto3" json:"updated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateStatusResponse) Reset() {
+	*x = UpdateStatusResponse{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateStatusResponse) ProtoMessage() {}
+
+func (x *UpdateStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateStatusResponse.ProtoReflect.Descriptor instead.
+func (*UpdateStatusResponse) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UpdateStatusResponse) GetUpdated() bool {
+	if x != nil {
+		return x.Updated
+	}
+	return false
+}
+
 type GetTorrentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -31,7 +327,7 @@ type GetTorrentRequest struct {
 
 func (x *GetTorrentRequest) Reset() {
 	*x = GetTorrentRequest{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[0]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +339,7 @@ func (x *GetTorrentRequest) String() string {
 func (*GetTorrentRequest) ProtoMessage() {}
 
 func (x *GetTorrentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[0]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +352,7 @@ func (x *GetTorrentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTorrentRequest.ProtoReflect.Descriptor instead.
 func (*GetTorrentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{0}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetTorrentRequest) GetId() string {
@@ -75,7 +371,7 @@ type GetTorrentResponse struct {
 
 func (x *GetTorrentResponse) Reset() {
 	*x = GetTorrentResponse{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[1]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -87,7 +383,7 @@ func (x *GetTorrentResponse) String() string {
 func (*GetTorrentResponse) ProtoMessage() {}
 
 func (x *GetTorrentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[1]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -100,7 +396,7 @@ func (x *GetTorrentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTorrentResponse.ProtoReflect.Descriptor instead.
 func (*GetTorrentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{1}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetTorrentResponse) GetTorrent() *Torrent {
@@ -120,7 +416,7 @@ type ListTorrentsRequest struct {
 
 func (x *ListTorrentsRequest) Reset() {
 	*x = ListTorrentsRequest{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[2]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -132,7 +428,7 @@ func (x *ListTorrentsRequest) String() string {
 func (*ListTorrentsRequest) ProtoMessage() {}
 
 func (x *ListTorrentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[2]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -145,7 +441,7 @@ func (x *ListTorrentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTorrentsRequest.ProtoReflect.Descriptor instead.
 func (*ListTorrentsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{2}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListTorrentsRequest) GetLimit() int32 {
@@ -171,7 +467,7 @@ type ListTorrentsResponse struct {
 
 func (x *ListTorrentsResponse) Reset() {
 	*x = ListTorrentsResponse{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[3]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -183,7 +479,7 @@ func (x *ListTorrentsResponse) String() string {
 func (*ListTorrentsResponse) ProtoMessage() {}
 
 func (x *ListTorrentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[3]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -196,7 +492,7 @@ func (x *ListTorrentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTorrentsResponse.ProtoReflect.Descriptor instead.
 func (*ListTorrentsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{3}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListTorrentsResponse) GetTorrents() []*Torrent {
@@ -219,7 +515,7 @@ type CreateTorrentRequest struct {
 
 func (x *CreateTorrentRequest) Reset() {
 	*x = CreateTorrentRequest{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[4]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -231,7 +527,7 @@ func (x *CreateTorrentRequest) String() string {
 func (*CreateTorrentRequest) ProtoMessage() {}
 
 func (x *CreateTorrentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[4]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -244,7 +540,7 @@ func (x *CreateTorrentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTorrentRequest.ProtoReflect.Descriptor instead.
 func (*CreateTorrentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{4}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateTorrentRequest) GetName() string {
@@ -291,7 +587,7 @@ type CreateTorrentResponse struct {
 
 func (x *CreateTorrentResponse) Reset() {
 	*x = CreateTorrentResponse{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[5]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -303,7 +599,7 @@ func (x *CreateTorrentResponse) String() string {
 func (*CreateTorrentResponse) ProtoMessage() {}
 
 func (x *CreateTorrentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[5]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -316,7 +612,7 @@ func (x *CreateTorrentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTorrentResponse.ProtoReflect.Descriptor instead.
 func (*CreateTorrentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{5}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateTorrentResponse) GetTorrent() *Torrent {
@@ -335,7 +631,7 @@ type DeleteTorrentRequest struct {
 
 func (x *DeleteTorrentRequest) Reset() {
 	*x = DeleteTorrentRequest{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[6]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -347,7 +643,7 @@ func (x *DeleteTorrentRequest) String() string {
 func (*DeleteTorrentRequest) ProtoMessage() {}
 
 func (x *DeleteTorrentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[6]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -360,7 +656,7 @@ func (x *DeleteTorrentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTorrentRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTorrentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{6}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DeleteTorrentRequest) GetId() string {
@@ -379,7 +675,7 @@ type DeleteTorrentResponse struct {
 
 func (x *DeleteTorrentResponse) Reset() {
 	*x = DeleteTorrentResponse{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[7]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +687,7 @@ func (x *DeleteTorrentResponse) String() string {
 func (*DeleteTorrentResponse) ProtoMessage() {}
 
 func (x *DeleteTorrentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[7]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +700,7 @@ func (x *DeleteTorrentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTorrentResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTorrentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{7}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DeleteTorrentResponse) GetDeleted() bool {
@@ -412,6 +708,66 @@ func (x *DeleteTorrentResponse) GetDeleted() bool {
 		return x.Deleted
 	}
 	return false
+}
+
+type Category struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ParentId      *string                `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3,oneof" json:"parent_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Category) Reset() {
+	*x = Category{}
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Category) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Category) ProtoMessage() {}
+
+func (x *Category) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Category.ProtoReflect.Descriptor instead.
+func (*Category) Descriptor() ([]byte, []int) {
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *Category) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Category) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Category) GetParentId() string {
+	if x != nil && x.ParentId != nil {
+		return *x.ParentId
+	}
+	return ""
 }
 
 type Torrent struct {
@@ -432,7 +788,7 @@ type Torrent struct {
 
 func (x *Torrent) Reset() {
 	*x = Torrent{}
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[8]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +800,7 @@ func (x *Torrent) String() string {
 func (*Torrent) ProtoMessage() {}
 
 func (x *Torrent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[8]
+	mi := &file_proto_torrent_v1_torrent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,7 +813,7 @@ func (x *Torrent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Torrent.ProtoReflect.Descriptor instead.
 func (*Torrent) Descriptor() ([]byte, []int) {
-	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{8}
+	return file_proto_torrent_v1_torrent_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Torrent) GetId() string {
@@ -535,7 +891,33 @@ var File_proto_torrent_v1_torrent_proto protoreflect.FileDescriptor
 const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	"\n" +
 	"\x1eproto/torrent/v1/torrent.proto\x12\n" +
-	"torrent.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"#\n" +
+	"torrent.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x15\n" +
+	"\x13ListCategoryRequest\"L\n" +
+	"\x14ListCategoryResponse\x124\n" +
+	"\n" +
+	"categories\x18\x01 \x03(\v2\x14.torrent.v1.CategoryR\n" +
+	"categories\"\xe5\x01\n" +
+	"\x14UpdateTorrentRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
+	"\vdescription\x18\x03 \x01(\tH\x01R\vdescription\x88\x01\x01\x12 \n" +
+	"\tinfo_hash\x18\x04 \x01(\tH\x02R\binfoHash\x88\x01\x01\x12$\n" +
+	"\vcategory_id\x18\x05 \x01(\tH\x03R\n" +
+	"categoryId\x88\x01\x01B\a\n" +
+	"\x05_nameB\x0e\n" +
+	"\f_descriptionB\f\n" +
+	"\n" +
+	"_info_hashB\x0e\n" +
+	"\f_category_id\"F\n" +
+	"\x15UpdateTorrentResponse\x12-\n" +
+	"\atorrent\x18\x01 \x01(\v2\x13.torrent.v1.TorrentR\atorrent\"S\n" +
+	"\x13UpdateStatusRequest\x12\x1d\n" +
+	"\n" +
+	"torrent_id\x18\x01 \x01(\tR\ttorrentId\x12\x1d\n" +
+	"\n" +
+	"new_status\x18\x02 \x01(\x05R\tnewStatus\"0\n" +
+	"\x14UpdateStatusResponse\x12\x18\n" +
+	"\aupdated\x18\x01 \x01(\bR\aupdated\"#\n" +
 	"\x11GetTorrentRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"C\n" +
 	"\x12GetTorrentResponse\x12-\n" +
@@ -557,7 +939,13 @@ const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	"\x14DeleteTorrentRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"1\n" +
 	"\x15DeleteTorrentResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xd6\x02\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\"^\n" +
+	"\bCategory\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\tparent_id\x18\x03 \x01(\tH\x00R\bparentId\x88\x01\x01B\f\n" +
+	"\n" +
+	"_parent_id\"\xd6\x02\n" +
 	"\aTorrent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -572,13 +960,16 @@ const file_proto_torrent_v1_torrent_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xdc\x02\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xd8\x04\n" +
 	"\x0eTorrentService\x12K\n" +
 	"\n" +
 	"GetTorrent\x12\x1d.torrent.v1.GetTorrentRequest\x1a\x1e.torrent.v1.GetTorrentResponse\x12T\n" +
 	"\rCreateTorrent\x12 .torrent.v1.CreateTorrentRequest\x1a!.torrent.v1.CreateTorrentResponse\x12T\n" +
 	"\rDeleteTorrent\x12 .torrent.v1.DeleteTorrentRequest\x1a!.torrent.v1.DeleteTorrentResponse\x12Q\n" +
-	"\fListTorrents\x12\x1f.torrent.v1.ListTorrentsRequest\x1a .torrent.v1.ListTorrentsResponseB7Z5github.com/monstrong/gracker2/proto/gen/go/torrent/v1b\x06proto3"
+	"\fListTorrents\x12\x1f.torrent.v1.ListTorrentsRequest\x1a .torrent.v1.ListTorrentsResponse\x12T\n" +
+	"\rUpdateTorrent\x12 .torrent.v1.UpdateTorrentRequest\x1a!.torrent.v1.UpdateTorrentResponse\x12Q\n" +
+	"\fUpdateStatus\x12\x1f.torrent.v1.UpdateStatusRequest\x1a .torrent.v1.UpdateStatusResponse\x12Q\n" +
+	"\fListCategory\x12\x1f.torrent.v1.ListCategoryRequest\x1a .torrent.v1.ListCategoryResponseB7Z5github.com/monstrong/gracker2/proto/gen/go/torrent/v1b\x06proto3"
 
 var (
 	file_proto_torrent_v1_torrent_proto_rawDescOnce sync.Once
@@ -592,38 +983,53 @@ func file_proto_torrent_v1_torrent_proto_rawDescGZIP() []byte {
 	return file_proto_torrent_v1_torrent_proto_rawDescData
 }
 
-var file_proto_torrent_v1_torrent_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_proto_torrent_v1_torrent_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_proto_torrent_v1_torrent_proto_goTypes = []any{
-	(*GetTorrentRequest)(nil),     // 0: torrent.v1.GetTorrentRequest
-	(*GetTorrentResponse)(nil),    // 1: torrent.v1.GetTorrentResponse
-	(*ListTorrentsRequest)(nil),   // 2: torrent.v1.ListTorrentsRequest
-	(*ListTorrentsResponse)(nil),  // 3: torrent.v1.ListTorrentsResponse
-	(*CreateTorrentRequest)(nil),  // 4: torrent.v1.CreateTorrentRequest
-	(*CreateTorrentResponse)(nil), // 5: torrent.v1.CreateTorrentResponse
-	(*DeleteTorrentRequest)(nil),  // 6: torrent.v1.DeleteTorrentRequest
-	(*DeleteTorrentResponse)(nil), // 7: torrent.v1.DeleteTorrentResponse
-	(*Torrent)(nil),               // 8: torrent.v1.Torrent
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*ListCategoryRequest)(nil),   // 0: torrent.v1.ListCategoryRequest
+	(*ListCategoryResponse)(nil),  // 1: torrent.v1.ListCategoryResponse
+	(*UpdateTorrentRequest)(nil),  // 2: torrent.v1.UpdateTorrentRequest
+	(*UpdateTorrentResponse)(nil), // 3: torrent.v1.UpdateTorrentResponse
+	(*UpdateStatusRequest)(nil),   // 4: torrent.v1.UpdateStatusRequest
+	(*UpdateStatusResponse)(nil),  // 5: torrent.v1.UpdateStatusResponse
+	(*GetTorrentRequest)(nil),     // 6: torrent.v1.GetTorrentRequest
+	(*GetTorrentResponse)(nil),    // 7: torrent.v1.GetTorrentResponse
+	(*ListTorrentsRequest)(nil),   // 8: torrent.v1.ListTorrentsRequest
+	(*ListTorrentsResponse)(nil),  // 9: torrent.v1.ListTorrentsResponse
+	(*CreateTorrentRequest)(nil),  // 10: torrent.v1.CreateTorrentRequest
+	(*CreateTorrentResponse)(nil), // 11: torrent.v1.CreateTorrentResponse
+	(*DeleteTorrentRequest)(nil),  // 12: torrent.v1.DeleteTorrentRequest
+	(*DeleteTorrentResponse)(nil), // 13: torrent.v1.DeleteTorrentResponse
+	(*Category)(nil),              // 14: torrent.v1.Category
+	(*Torrent)(nil),               // 15: torrent.v1.Torrent
+	(*timestamppb.Timestamp)(nil), // 16: google.protobuf.Timestamp
 }
 var file_proto_torrent_v1_torrent_proto_depIdxs = []int32{
-	8, // 0: torrent.v1.GetTorrentResponse.torrent:type_name -> torrent.v1.Torrent
-	8, // 1: torrent.v1.ListTorrentsResponse.torrents:type_name -> torrent.v1.Torrent
-	8, // 2: torrent.v1.CreateTorrentResponse.torrent:type_name -> torrent.v1.Torrent
-	9, // 3: torrent.v1.Torrent.created_at:type_name -> google.protobuf.Timestamp
-	9, // 4: torrent.v1.Torrent.updated_at:type_name -> google.protobuf.Timestamp
-	0, // 5: torrent.v1.TorrentService.GetTorrent:input_type -> torrent.v1.GetTorrentRequest
-	4, // 6: torrent.v1.TorrentService.CreateTorrent:input_type -> torrent.v1.CreateTorrentRequest
-	6, // 7: torrent.v1.TorrentService.DeleteTorrent:input_type -> torrent.v1.DeleteTorrentRequest
-	2, // 8: torrent.v1.TorrentService.ListTorrents:input_type -> torrent.v1.ListTorrentsRequest
-	1, // 9: torrent.v1.TorrentService.GetTorrent:output_type -> torrent.v1.GetTorrentResponse
-	5, // 10: torrent.v1.TorrentService.CreateTorrent:output_type -> torrent.v1.CreateTorrentResponse
-	7, // 11: torrent.v1.TorrentService.DeleteTorrent:output_type -> torrent.v1.DeleteTorrentResponse
-	3, // 12: torrent.v1.TorrentService.ListTorrents:output_type -> torrent.v1.ListTorrentsResponse
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	14, // 0: torrent.v1.ListCategoryResponse.categories:type_name -> torrent.v1.Category
+	15, // 1: torrent.v1.UpdateTorrentResponse.torrent:type_name -> torrent.v1.Torrent
+	15, // 2: torrent.v1.GetTorrentResponse.torrent:type_name -> torrent.v1.Torrent
+	15, // 3: torrent.v1.ListTorrentsResponse.torrents:type_name -> torrent.v1.Torrent
+	15, // 4: torrent.v1.CreateTorrentResponse.torrent:type_name -> torrent.v1.Torrent
+	16, // 5: torrent.v1.Torrent.created_at:type_name -> google.protobuf.Timestamp
+	16, // 6: torrent.v1.Torrent.updated_at:type_name -> google.protobuf.Timestamp
+	6,  // 7: torrent.v1.TorrentService.GetTorrent:input_type -> torrent.v1.GetTorrentRequest
+	10, // 8: torrent.v1.TorrentService.CreateTorrent:input_type -> torrent.v1.CreateTorrentRequest
+	12, // 9: torrent.v1.TorrentService.DeleteTorrent:input_type -> torrent.v1.DeleteTorrentRequest
+	8,  // 10: torrent.v1.TorrentService.ListTorrents:input_type -> torrent.v1.ListTorrentsRequest
+	2,  // 11: torrent.v1.TorrentService.UpdateTorrent:input_type -> torrent.v1.UpdateTorrentRequest
+	4,  // 12: torrent.v1.TorrentService.UpdateStatus:input_type -> torrent.v1.UpdateStatusRequest
+	0,  // 13: torrent.v1.TorrentService.ListCategory:input_type -> torrent.v1.ListCategoryRequest
+	7,  // 14: torrent.v1.TorrentService.GetTorrent:output_type -> torrent.v1.GetTorrentResponse
+	11, // 15: torrent.v1.TorrentService.CreateTorrent:output_type -> torrent.v1.CreateTorrentResponse
+	13, // 16: torrent.v1.TorrentService.DeleteTorrent:output_type -> torrent.v1.DeleteTorrentResponse
+	9,  // 17: torrent.v1.TorrentService.ListTorrents:output_type -> torrent.v1.ListTorrentsResponse
+	3,  // 18: torrent.v1.TorrentService.UpdateTorrent:output_type -> torrent.v1.UpdateTorrentResponse
+	5,  // 19: torrent.v1.TorrentService.UpdateStatus:output_type -> torrent.v1.UpdateStatusResponse
+	1,  // 20: torrent.v1.TorrentService.ListCategory:output_type -> torrent.v1.ListCategoryResponse
+	14, // [14:21] is the sub-list for method output_type
+	7,  // [7:14] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_proto_torrent_v1_torrent_proto_init() }
@@ -631,13 +1037,15 @@ func file_proto_torrent_v1_torrent_proto_init() {
 	if File_proto_torrent_v1_torrent_proto != nil {
 		return
 	}
+	file_proto_torrent_v1_torrent_proto_msgTypes[2].OneofWrappers = []any{}
+	file_proto_torrent_v1_torrent_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_torrent_v1_torrent_proto_rawDesc), len(file_proto_torrent_v1_torrent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

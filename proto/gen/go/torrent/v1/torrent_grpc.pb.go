@@ -23,6 +23,9 @@ const (
 	TorrentService_CreateTorrent_FullMethodName = "/torrent.v1.TorrentService/CreateTorrent"
 	TorrentService_DeleteTorrent_FullMethodName = "/torrent.v1.TorrentService/DeleteTorrent"
 	TorrentService_ListTorrents_FullMethodName  = "/torrent.v1.TorrentService/ListTorrents"
+	TorrentService_UpdateTorrent_FullMethodName = "/torrent.v1.TorrentService/UpdateTorrent"
+	TorrentService_UpdateStatus_FullMethodName  = "/torrent.v1.TorrentService/UpdateStatus"
+	TorrentService_ListCategory_FullMethodName  = "/torrent.v1.TorrentService/ListCategory"
 )
 
 // TorrentServiceClient is the client API for TorrentService service.
@@ -33,6 +36,9 @@ type TorrentServiceClient interface {
 	CreateTorrent(ctx context.Context, in *CreateTorrentRequest, opts ...grpc.CallOption) (*CreateTorrentResponse, error)
 	DeleteTorrent(ctx context.Context, in *DeleteTorrentRequest, opts ...grpc.CallOption) (*DeleteTorrentResponse, error)
 	ListTorrents(ctx context.Context, in *ListTorrentsRequest, opts ...grpc.CallOption) (*ListTorrentsResponse, error)
+	UpdateTorrent(ctx context.Context, in *UpdateTorrentRequest, opts ...grpc.CallOption) (*UpdateTorrentResponse, error)
+	UpdateStatus(ctx context.Context, in *UpdateStatusRequest, opts ...grpc.CallOption) (*UpdateStatusResponse, error)
+	ListCategory(ctx context.Context, in *ListCategoryRequest, opts ...grpc.CallOption) (*ListCategoryResponse, error)
 }
 
 type torrentServiceClient struct {
@@ -83,6 +89,36 @@ func (c *torrentServiceClient) ListTorrents(ctx context.Context, in *ListTorrent
 	return out, nil
 }
 
+func (c *torrentServiceClient) UpdateTorrent(ctx context.Context, in *UpdateTorrentRequest, opts ...grpc.CallOption) (*UpdateTorrentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTorrentResponse)
+	err := c.cc.Invoke(ctx, TorrentService_UpdateTorrent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *torrentServiceClient) UpdateStatus(ctx context.Context, in *UpdateStatusRequest, opts ...grpc.CallOption) (*UpdateStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateStatusResponse)
+	err := c.cc.Invoke(ctx, TorrentService_UpdateStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *torrentServiceClient) ListCategory(ctx context.Context, in *ListCategoryRequest, opts ...grpc.CallOption) (*ListCategoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCategoryResponse)
+	err := c.cc.Invoke(ctx, TorrentService_ListCategory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TorrentServiceServer is the server API for TorrentService service.
 // All implementations must embed UnimplementedTorrentServiceServer
 // for forward compatibility.
@@ -91,6 +127,9 @@ type TorrentServiceServer interface {
 	CreateTorrent(context.Context, *CreateTorrentRequest) (*CreateTorrentResponse, error)
 	DeleteTorrent(context.Context, *DeleteTorrentRequest) (*DeleteTorrentResponse, error)
 	ListTorrents(context.Context, *ListTorrentsRequest) (*ListTorrentsResponse, error)
+	UpdateTorrent(context.Context, *UpdateTorrentRequest) (*UpdateTorrentResponse, error)
+	UpdateStatus(context.Context, *UpdateStatusRequest) (*UpdateStatusResponse, error)
+	ListCategory(context.Context, *ListCategoryRequest) (*ListCategoryResponse, error)
 	mustEmbedUnimplementedTorrentServiceServer()
 }
 
@@ -112,6 +151,15 @@ func (UnimplementedTorrentServiceServer) DeleteTorrent(context.Context, *DeleteT
 }
 func (UnimplementedTorrentServiceServer) ListTorrents(context.Context, *ListTorrentsRequest) (*ListTorrentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTorrents not implemented")
+}
+func (UnimplementedTorrentServiceServer) UpdateTorrent(context.Context, *UpdateTorrentRequest) (*UpdateTorrentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateTorrent not implemented")
+}
+func (UnimplementedTorrentServiceServer) UpdateStatus(context.Context, *UpdateStatusRequest) (*UpdateStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateStatus not implemented")
+}
+func (UnimplementedTorrentServiceServer) ListCategory(context.Context, *ListCategoryRequest) (*ListCategoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCategory not implemented")
 }
 func (UnimplementedTorrentServiceServer) mustEmbedUnimplementedTorrentServiceServer() {}
 func (UnimplementedTorrentServiceServer) testEmbeddedByValue()                        {}
@@ -206,6 +254,60 @@ func _TorrentService_ListTorrents_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TorrentService_UpdateTorrent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTorrentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TorrentServiceServer).UpdateTorrent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TorrentService_UpdateTorrent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TorrentServiceServer).UpdateTorrent(ctx, req.(*UpdateTorrentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TorrentService_UpdateStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TorrentServiceServer).UpdateStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TorrentService_UpdateStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TorrentServiceServer).UpdateStatus(ctx, req.(*UpdateStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TorrentService_ListCategory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCategoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TorrentServiceServer).ListCategory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TorrentService_ListCategory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TorrentServiceServer).ListCategory(ctx, req.(*ListCategoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TorrentService_ServiceDesc is the grpc.ServiceDesc for TorrentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +330,18 @@ var TorrentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTorrents",
 			Handler:    _TorrentService_ListTorrents_Handler,
+		},
+		{
+			MethodName: "UpdateTorrent",
+			Handler:    _TorrentService_UpdateTorrent_Handler,
+		},
+		{
+			MethodName: "UpdateStatus",
+			Handler:    _TorrentService_UpdateStatus_Handler,
+		},
+		{
+			MethodName: "ListCategory",
+			Handler:    _TorrentService_ListCategory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

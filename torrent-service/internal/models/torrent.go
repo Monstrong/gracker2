@@ -18,15 +18,23 @@ type Torrent struct {
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
 }
+type Category struct {
+	ID       uuid.UUID  `db:"id"`
+	Name     string     `db:"name"`
+	ParentID *uuid.UUID `db:"parent_id"`
+}
 
 type TorrentPatch struct {
-	Name        string    `json:"title"`
-	Description string    `json:"description"`
-	InfoHash    string    `json:"info_hash"`
-	CategoryID  uuid.UUID `json:"category_id"`
+	Name        *string    `json:"title"`
+	Description *string    `json:"description"`
+	InfoHash    *string    `json:"info_hash"`
+	CategoryID  *uuid.UUID `json:"category_id"`
 }
 
 const (
 	MaxLimit  = 200
 	MaxOffset = 1000000
+
+	NameMaxLen        = 80
+	DescriptionMaxLen = 1000
 )

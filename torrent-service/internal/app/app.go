@@ -48,14 +48,16 @@ func New(ctx context.Context) (*App, error) {
 	l.Info(ctx, "db pool init complete")
 
 	repo := repository.NewPostgresRepository(pool)
-	svc := service.NewTorrentService(repo)
+	catrepo := repository.NewCategoriesRepository(pool)
+	svc := service.NewTorrentService(repo, catrepo)
 	handler := transport.NewServer(svc)
 
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptors.RecoveryInterceptor(l),
 			interceptors.LoggingInterceptor(l),
+			interceptors.RecoveryInterceptor(l),
 			interceptors.TimeoutInterceptor(&cfg.Grpc),
+			interceptors.BlockForBannedAndBillingInterceptor(),
 		))
 	pb.RegisterTorrentServiceServer(grpcServer, handler)
 

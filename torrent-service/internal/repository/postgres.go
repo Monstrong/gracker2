@@ -9,8 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/monstrong/gracker2/torrent-service/internal/models"
 	"github.com/monstrong/gracker2/pkg/errs"
+	"github.com/monstrong/gracker2/torrent-service/internal/models"
+
+	sq "github.com/Masterminds/squirrel"
 )
 
 type PostgresRepository struct {
@@ -23,11 +25,81 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	}
 }
 
+const torrentColumns = "id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at"
+
+var psql = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+func (r *PostgresRepository) Update(ctx context.Context, patch *models.TorrentPatch, id uuid.UUID) (*models.Torrent, error) {
+	const op = "repo.postgres.update"
+
+	b := psql.Update("torrents")
+
+	if patch.Name != nil {
+		b = b.Set("name", *patch.Name)
+	}
+	if patch.Description != nil {
+		b = b.Set("description", *patch.Description)
+	}
+	if patch.CategoryID != nil {
+		b = b.Set("category_id", *patch.CategoryID)
+	}
+	if patch.InfoHash != nil {
+		b = b.Set("info_hash", *patch.InfoHash)
+	}
+
+	b = b.Set("updated_at", sq.Expr("CURRENT_TIMESTAMP"))
+	b = b.Where(sq.Eq{"id": id})
+	b = b.Suffix(fmt.Sprintf(`RETURNING %s`, torrentColumns))
+
+	query, args, err := b.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	var t models.Torrent
+	err = r.db.QueryRow(ctx, query, args...).Scan(
+		&t.ID,
+		&t.Name,
+		&t.Description,
+		&t.InfoHash,
+		&t.Status,
+		&t.AuthorID,
+		&t.CategoryID,
+		&t.Downloads,
+		&t.CreatedAt,
+		&t.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, errs.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &t, nil
+}
+
+func (r *PostgresRepository) StatusUpdate(ctx context.Context, id uuid.UUID, status int) (bool, error) {
+	const op = "repo.postgres.statusupdate"
+
+	query := `UPDATE torrents SET status = $2,
+    updated_at = CURRENT_TIMESTAMP
+	WHERE id = $1`
+	CommandTag, err := r.db.Exec(ctx, query, id, status)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if CommandTag.RowsAffected() == 0 { // отсутствие совпадений
+		return false, nil
+	}
+	return true, nil
+}
+
 func (r *PostgresRepository) GetTorrentStatus(ctx context.Context, id uuid.UUID) (int, error) {
 	const op = "repo.postgres.gettorrentstatus"
 
 	var status int
-	query := `SELECT status FROM torrents WHERE id = &1`
+	query := `SELECT status FROM torrents WHERE id = $1`
 	err := r.db.QueryRow(ctx, query, id).Scan(&status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -55,11 +127,10 @@ func (r *PostgresRepository) GetTorrentAuthorId(ctx context.Context, id uuid.UUI
 
 func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*models.Torrent, error) {
 	const op = "repo.postgres.create"
-	query := `
+	query := fmt.Sprintf(`
 	INSERT INTO torrents (name, description, info_hash, author_id, category_id)
 	VALUES ($1, $2, $3, $4, $5)
-	RETURNING id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at
-	`
+	RETURNING %s`, torrentColumns)
 	err := r.db.QueryRow(ctx, query,
 		t.Name,
 		t.Description,
@@ -94,8 +165,9 @@ func (r *PostgresRepository) Create(ctx context.Context, t *models.Torrent) (*mo
 func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]*models.Torrent, error) {
 	const op = "repo.postgres.list"
 	var ts []*models.Torrent
-	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents 
-	ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	query := fmt.Sprintf(`SELECT %s FROM torrents 
+	WHERE status > -1
+	ORDER BY created_at DESC LIMIT $1 OFFSET $2`, torrentColumns)
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -131,7 +203,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	const op = "repo.postgres.getbyid"
 
 	var t models.Torrent
-	query := `SELECT id, name, description, info_hash, status, author_id, category_id, downloads, created_at, updated_at FROM torrents WHERE id = $1`
+	query := fmt.Sprintf(`SELECT %s FROM torrents WHERE id = $1`, torrentColumns)
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&t.ID,
 		&t.Name,

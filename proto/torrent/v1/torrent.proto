@@ -8,15 +8,23 @@ service TorrentService {
   rpc CreateTorrent(CreateTorrentRequest) returns (CreateTorrentResponse);
   rpc DeleteTorrent(DeleteTorrentRequest) returns (DeleteTorrentResponse);
   rpc ListTorrents(ListTorrentsRequest) returns (ListTorrentsResponse);
-  rpc UpdateTorrent(UpdateTorrentRequest) returns (UpdateTorrentRequest);
+  rpc UpdateTorrent(UpdateTorrentRequest) returns (UpdateTorrentResponse);
   rpc UpdateStatus(UpdateStatusRequest) returns (UpdateStatusResponse);
+  rpc ListCategory(ListCategoryRequest) returns (ListCategoryResponse);
+}
+
+message ListCategoryRequest {}
+
+message ListCategoryResponse {
+  repeated Category categories = 1;
 }
 
 message UpdateTorrentRequest {
-  optional string name = 1;
-  optional string description = 2;
-  optional string info_hash = 3;
-  optional string categoryID = 4;
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional string info_hash = 4;
+  optional string category_id = 5;
 }
 
 message UpdateTorrentResponse {
@@ -25,7 +33,7 @@ message UpdateTorrentResponse {
 
 message UpdateStatusRequest {
   string torrent_id = 1;
-  string new_status = 2;
+  int32 new_status = 2;
 }
 
 message UpdateStatusResponse {
@@ -69,6 +77,11 @@ message DeleteTorrentResponse {
   bool deleted = 1;
 }
 
+message Category {
+  string id   = 1;
+  string name = 2;
+  optional string parent_id = 3;
+}
 message Torrent {
   string                    id          = 1;
   string                    name        = 2;

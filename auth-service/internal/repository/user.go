@@ -20,7 +20,6 @@ type PostgresRepository struct {
 	db *pgxpool.Pool
 }
 
-
 const userColumns = `id, name, email, role, premium, avatar_url, bio, created_at, updated_at`
 const userPublicColumns = `id, name, role, premium, avatar_url, bio, created_at, updated_at`
 
@@ -290,7 +289,6 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.UserPatch
 	return &nu, nil
 
 }
-
 
 func (r *PostgresRepository) scanInUPubliWwhereX(ctx context.Context, query string, x any, u *models.UserPublic) error {
 	err := r.db.QueryRow(ctx, query, x).Scan(
