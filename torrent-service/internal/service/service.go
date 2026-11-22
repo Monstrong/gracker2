@@ -10,6 +10,17 @@ import (
 	"github.com/monstrong/gracker2/torrent-service/internal/models"
 )
 
+func (s *TorrentService) CategoriesList(ctx context.Context) ([]*models.Category, error) {
+	const op = "service.torrent.listcategories"
+
+    categories, err := s.categoriesRepo.List(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("%s: %w", op, err)
+    }
+
+    return categories, nil
+}
+
 func (s *TorrentService) StatusUpdate(ctx context.Context, torrentID uuid.UUID, newStatus int, SenderRole domain.Role) (bool, error) {
 	const op = "service.torrentService.statusUpdate"
 	if err := validateRole(SenderRole); err != nil {

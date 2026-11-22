@@ -21,7 +21,7 @@ func NewTorrentService(r Repository, categoriesRepo CategoriesRepo) *TorrentServ
 
 type CategoriesRepo interface {
 	IsExists(ctx context.Context, categoryID uuid.UUID) (bool, error)
-	List(ctx context.Context, limit, offset int) ([]*models.Category, error)
+	List(ctx context.Context) ([]*models.Category, error)
 }
 
 type Repository interface {

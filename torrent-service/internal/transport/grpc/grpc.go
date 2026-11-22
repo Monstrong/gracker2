@@ -13,6 +13,36 @@ import (
 
 // Тут нет смысла добавлять "op" в ошибки. вызываемый метод уже известен клиенту
 
+func (s *Server) ListCategory(
+    ctx context.Context,
+    in *pb.ListCategoryRequest,
+) (*pb.ListCategoryResponse, error) {
+    categories, err := s.s.CategoriesList(ctx)
+    if err != nil {
+        return nil, err
+    }
+
+    response := &pb.ListCategoryResponse{
+        Categories: make([]*pb.Category, 0, len(categories)),
+    }
+
+    for _, category := range categories {
+        item := &pb.Category{
+            Id:   category.ID.String(),
+            Name: category.Name,
+        }
+
+        if category.ParentID != nil {
+            parentID := category.ParentID.String()
+            item.ParentId = &parentID
+        }
+
+        response.Categories = append(response.Categories, item)
+    }
+
+    return response, nil
+}
+
 // StatusUpdate wants SenderRole in metadata
 func (s *Server) UpdateStatus(ctx context.Context, in *pb.UpdateStatusRequest) (*pb.UpdateStatusResponse, error) {
 	torrentID, err := uuid.Parse(in.GetTorrentId())

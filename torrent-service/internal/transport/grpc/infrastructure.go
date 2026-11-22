@@ -25,4 +25,5 @@ type Service interface {
 	Delete(ctx context.Context, id uuid.UUID, SenderID uuid.UUID, SenderRole domain.Role) (bool, error)
 	Update(ctx context.Context, torrent *models.TorrentPatch, TorrentID, SenderID uuid.UUID, SenderRole domain.Role) (*models.Torrent, error)
 	StatusUpdate(ctx context.Context, torrentID uuid.UUID, newStatus int, SenderRole domain.Role) (bool, error)
+	CategoriesList(ctx context.Context) ([]*models.Category, error)
 }
