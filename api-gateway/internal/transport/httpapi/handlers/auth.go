@@ -373,7 +373,7 @@ func (h *AuthHandler) GetUser(w http.ResponseWriter, r *http.Request, id string)
 	uuidId, err := uuid.Parse(id)
 	if err != nil {
 		h.l.Info(ctx, "user sent invalid id", logger.String("op", op))
-		writeError(w, http.StatusBadRequest, "bad request")
+		writeError(w, http.StatusBadRequest, "id must be uuid")
 		return
 	}
 
@@ -431,7 +431,7 @@ func (h *AuthHandler) AdminGetUser(w http.ResponseWriter, r *http.Request, id st
 	uuidId, err := uuid.Parse(id)
 	if err != nil {
 		h.l.Info(ctx, "user sent invalid id", logger.String("op", op))
-		writeError(w, http.StatusBadRequest, "bad request")
+		writeError(w, http.StatusBadRequest, "id must be uuid")
 		return
 	}
 
